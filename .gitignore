@@ -1,0 +1,8 @@
+.cursorrules
+lombard_api.log
+.ai
+.idea
+tests
+manual_test.py
+*/__pycache__
+.DS_Store
