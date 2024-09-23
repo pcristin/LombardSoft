@@ -17,6 +17,7 @@ BASCULE_CONTRACT_ABI = 'abi/bascule_contract.json'
 # API Base URL
 MAINNET_BASE_URL = "https://mainnet.prod.lombard.finance"
 TESTNET_BASE_URL = "https://gastald-testnet.prod.lombard.finance"
+
 # Other constants
 CHAIN_ID = 1  # Ethereum Mainnet
 REFERRAL_ID = "lombard"

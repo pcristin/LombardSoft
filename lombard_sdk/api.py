@@ -6,7 +6,13 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from typing import List, Dict, Any, Optional
 from .constants import TESTNET_BASE_URL, CHAIN_ID, REFERRAL_ID, MAINNET_BASE_URL
+from captcha_sdk.captcha_solver import CaptchaSolver
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
+
+CAPTCHA_API_KEY = os.getenv("CAPTCHA_API_KEY")
 # Set up logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -54,6 +60,7 @@ class LombardAPI:
             })
         logger.debug(f"LombardAPI initialized with address: {self.address}, chain_id: {self.chain_id}")
         self.base_url = base_url
+        self.captcha_solver = CaptchaSolver(CAPTCHA_API_KEY)
 
     def _generate_signature(self) -> str:
         """
@@ -108,15 +115,20 @@ class LombardAPI:
             str: The newly generated BTC deposit address.
 
         Raises:
-            Exception: If the API call fails.
+            Exception: If the API call or captcha solver fails.
         """
+        captcha_balance = self.captcha_solver.get_balance()
+        if captcha_balance < 0.0001:
+            logger.error("Captcha solver balance is low. Please add more funds.")
+            return None
+        logger.info(f"Captcha solver balance is enough: {captcha_balance}")
         logger.info("Generating new BTC deposit address")
         self.session.headers.update({
         })
         signature = self._generate_signature()
 
         payload = {
-            "captcha_token": "0",
+            "captcha": self.captcha_solver.solve_captcha(),
             "nonce": "0",
             "referral_id": self.referral_id,
             "to_address": self.address,
@@ -124,14 +136,24 @@ class LombardAPI:
             "to_chain": "DESTINATION_BLOCKCHAIN_ETHEREUM"
         }
         logger.debug(f"Payload for generate_deposit_btc_address: {payload}")
-        try: 
-            data = self._make_request('POST', '/api/v1/address/generate', json=payload)
-            btc_address = data['address']
-            logger.info(f"Generated BTC deposit address: {btc_address}")
-            return btc_address
-        except Exception as e:
-            logger.error(f"Error generating BTC deposit address: {e}")
-            return None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                data = self._make_request('POST', '/api/v1/address/generate', json=payload)
+                btc_address = data['address']
+                logger.info(f"Generated BTC deposit address: {btc_address}")
+                self.captcha_solver.report_correct_recaptcha()
+                return btc_address
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 401 and e.response.json().get('error') == 'bad captcha':
+                    if attempt < max_retries - 1:
+                        logger.warning("Bad captcha. Retrying with a new captcha token...")
+                        payload["captcha_token"] = self.captcha_solver.solve_captcha()
+                    else:
+                        logger.error("Max retries reached. Unable to generate BTC deposit address due to captcha issues.")
+                        return None
+                else:
+                    raise
 
     def get_deposit_btc_address(self) -> Optional[str]:
         """

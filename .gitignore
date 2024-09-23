@@ -6,3 +6,6 @@ tests
 manual_test.py
 */__pycache__
 .DS_Store
+captcha_sdk/__pycache__
+captcha_sdk/captcha_test.py
+.env
