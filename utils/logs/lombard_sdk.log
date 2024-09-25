@@ -1,0 +1,17 @@
+2024-09-24 11:37:00,372 - lombard_logger - INFO - Initializing LombardAPI
+2024-09-24 11:37:00,381 - lombard_logger - DEBUG - LombardAPI initialized with address: 0xE4fC9BdEa7FEf7A063e00773f9A73882F62d59c0, chain_id: 1
+2024-09-24 11:37:00,381 - lombard_logger - INFO - CaptchaSolver initialized
+2024-09-24 11:37:17,856 - lombard_logger - INFO - Initializing LombardAPI
+2024-09-24 11:37:17,862 - lombard_logger - DEBUG - LombardAPI initialized with address: 0xE4fC9BdEa7FEf7A063e00773f9A73882F62d59c0, chain_id: 1
+2024-09-24 11:37:17,863 - lombard_logger - INFO - CaptchaSolver initialized
+2024-09-24 11:37:17,863 - lombard_logger - INFO - Retrieving BTC deposit address
+2024-09-24 11:37:17,863 - lombard_logger - DEBUG - Params for get_deposit_btc_address: {'to_address': '0xE4fC9BdEa7FEf7A063e00773f9A73882F62d59c0', 'to_blockchain': 'DESTINATION_BLOCKCHAIN_ETHEREUM', 'limit': '1', 'offset': '0', 'asc': 'false', 'referral_id': 'lombard'}
+2024-09-24 11:37:17,863 - lombard_logger - DEBUG - Making GET request to https://mainnet.prod.lombard.finance/api/v1/address
+2024-09-24 11:37:17,863 - lombard_logger - DEBUG - Request kwargs: {'params': {'to_address': '0xE4fC9BdEa7FEf7A063e00773f9A73882F62d59c0', 'to_blockchain': 'DESTINATION_BLOCKCHAIN_ETHEREUM', 'limit': '1', 'offset': '0', 'asc': 'false', 'referral_id': 'lombard'}}
+2024-09-24 11:39:57,053 - lombard_logger - INFO - Initializing LombardAPI
+2024-09-24 11:39:57,058 - lombard_logger - DEBUG - LombardAPI initialized with address: 0xE4fC9BdEa7FEf7A063e00773f9A73882F62d59c0, chain_id: 1
+2024-09-24 11:39:57,058 - lombard_logger - INFO - CaptchaSolver initialized
+2024-09-24 11:39:57,058 - lombard_logger - INFO - Retrieving BTC deposit address
+2024-09-24 11:39:57,058 - lombard_logger - DEBUG - Params for get_deposit_btc_address: {'to_address': '0xE4fC9BdEa7FEf7A063e00773f9A73882F62d59c0', 'to_blockchain': 'DESTINATION_BLOCKCHAIN_ETHEREUM', 'limit': '1', 'offset': '0', 'asc': 'false', 'referral_id': 'lombard'}
+2024-09-24 11:39:57,059 - lombard_logger - DEBUG - Making GET request to https://mainnet.prod.lombard.finance/api/v1/address
+2024-09-24 11:39:57,059 - lombard_logger - DEBUG - Request kwargs: {'params': {'to_address': '0xE4fC9BdEa7FEf7A063e00773f9A73882F62d59c0', 'to_blockchain': 'DESTINATION_BLOCKCHAIN_ETHEREUM', 'limit': '1', 'offset': '0', 'asc': 'false', 'referral_id': 'lombard'}}

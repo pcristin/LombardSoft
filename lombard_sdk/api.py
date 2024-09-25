@@ -1,38 +1,18 @@
 # api.py
 
 import requests
-import logging
 from eth_account import Account
 from eth_account.messages import encode_defunct
-from typing import List, Dict, Any, Optional
-from .constants import TESTNET_BASE_URL, CHAIN_ID, REFERRAL_ID, MAINNET_BASE_URL
+from typing import List, Dict, Any, Optional, Union
+from lombard_sdk.constants import TESTNET_BASE_URL, CHAIN_ID, REFERRAL_ID, MAINNET_BASE_URL
 from captcha_sdk.captcha_solver import CaptchaSolver
 from dotenv import load_dotenv
 import os
+from utils.logger_config import logger
 
 load_dotenv()
 
 CAPTCHA_API_KEY = os.getenv("CAPTCHA_API_KEY")
-# Set up logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# Create a file handler
-file_handler = logging.FileHandler('lombard_api.log')
-file_handler.setLevel(logging.DEBUG)
-
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-# Create a formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-# Add the handlers to the logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
 
 class LombardAPI:
     """
@@ -57,10 +37,13 @@ class LombardAPI:
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json'
-            })
+        })
         logger.debug(f"LombardAPI initialized with address: {self.address}, chain_id: {self.chain_id}")
         self.base_url = base_url
+        if not CAPTCHA_API_KEY:
+            raise KeyError("You haven't provided the neccessary API KEY for captcha solving module! Terminating...")
         self.captcha_solver = CaptchaSolver(CAPTCHA_API_KEY)
+        
 
     def _generate_signature(self) -> str:
         """
@@ -107,7 +90,7 @@ class LombardAPI:
         logger.debug(f"Response data: {data}")
         return data
 
-    def generate_deposit_btc_address(self) -> str:
+    def generate_deposit_btc_address(self) -> Union[str, None]:
         """
         Generates a new BTC deposit address for the user's Ethereum address.
 
@@ -117,11 +100,11 @@ class LombardAPI:
         Raises:
             Exception: If the API call or captcha solver fails.
         """
-        captcha_balance = self.captcha_solver.get_balance()
+        captcha_balance = self.captcha_solver.get_solver_balance()
         if captcha_balance < 0.0001:
             logger.error("Captcha solver balance is low. Please add more funds.")
             return None
-        logger.info(f"Captcha solver balance is enough: {captcha_balance}")
+        logger.debug(f"Captcha solver balance is enough: {captcha_balance}")
         logger.info("Generating new BTC deposit address")
         self.session.headers.update({
         })
@@ -142,7 +125,6 @@ class LombardAPI:
                 data = self._make_request('POST', '/api/v1/address/generate', json=payload)
                 btc_address = data['address']
                 logger.info(f"Generated BTC deposit address: {btc_address}")
-                self.captcha_solver.report_correct_recaptcha()
                 return btc_address
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 401 and e.response.json().get('error') == 'bad captcha':
@@ -167,12 +149,12 @@ class LombardAPI:
         """
         logger.info("Retrieving BTC deposit address")
         params = {
-                "to_address": self.address,
-                "to_blockchain": "DESTINATION_BLOCKCHAIN_ETHEREUM",
-                "limit": "1",
-                "offset": "0",
-                "asc": "false",
-                "referral_id": self.referral_id
+            "to_address": self.address,
+            "to_blockchain": "DESTINATION_BLOCKCHAIN_ETHEREUM",
+            "limit": "1",
+            "offset": "0",
+            "asc": "false",
+            "referral_id": self.referral_id
         }
         logger.debug(f"Params for get_deposit_btc_address: {params}")
         try:
@@ -202,12 +184,12 @@ class LombardAPI:
         """
         logger.info("Retrieving all BTC deposit addresses")
         params = {
-                "to_address": self.address,
-                "to_blockchain": "DESTINATION_BLOCKCHAIN_ETHEREUM",
-                "limit": "1",
-                "offset": "0",
-                "asc": "false",
-                "referral_id": self.referral_id
+            "to_address": self.address,
+            "to_blockchain": "DESTINATION_BLOCKCHAIN_ETHEREUM",
+            "limit": "1",
+            "offset": "0",
+            "asc": "false",
+            "referral_id": self.referral_id
         }
         logger.debug(f"Params for get_deposit_btc_addresses: {params}")
         data = self._make_request('GET', '/api/v1/addresses', params=params)
