@@ -1,14 +1,13 @@
 .cursorrules
-lombard_api.log
 .ai
 .idea
 tests
 manual_test.py
 */__pycache__
 .DS_Store
-captcha_sdk/captcha_test.py
+sdks/captcha_sdk/captcha_test.py
 .env
 .vscode
 .venv
-exhanges_sdk/tests_sdk.py
-models/
+sdks/exchanges_sdk/tests_sdk.py
+utils/logs

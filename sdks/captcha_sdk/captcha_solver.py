@@ -1,7 +1,6 @@
 from anticaptchaofficial.recaptchav2proxyless import recaptchaV2Proxyless
-from captcha_sdk.constants import WEBSITE_URL, WEBSITE_KEY
+from sdks.captcha_sdk.constants import WEBSITE_URL, WEBSITE_KEY
 from utils.logger_config import logger
-from models.errors import CaptchaError
 
 class CaptchaSolver:
     def __init__(self, api_key: str) -> None:

@@ -4,8 +4,8 @@ import requests
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from typing import List, Dict, Any, Optional, Union
-from lombard_sdk.constants import TESTNET_BASE_URL, CHAIN_ID, REFERRAL_ID, MAINNET_BASE_URL
-from captcha_sdk.captcha_solver import CaptchaSolver
+from sdks.lombard_sdk.constants import TESTNET_BASE_URL, CHAIN_ID, REFERRAL_ID, MAINNET_BASE_URL
+from sdks.captcha_sdk.captcha_solver import CaptchaSolver
 from dotenv import load_dotenv
 import os
 from utils.logger_config import logger
@@ -19,7 +19,8 @@ class LombardAPI:
     A class to handle API-based operations for Lombard Finance.
     """
 
-    def __init__(self, private_key: str, chain_id: int = CHAIN_ID, referral_id: str = REFERRAL_ID, base_url: str = TESTNET_BASE_URL):
+    def __init__(self, private_key: str, chain_id: int = CHAIN_ID, referral_id: str = REFERRAL_ID, 
+                 base_url: str = TESTNET_BASE_URL, proxy: Optional[str] = None):
         """
         Initializes the LombardAPI class.
 
@@ -38,11 +39,20 @@ class LombardAPI:
         self.session.headers.update({
             'Content-Type': 'application/json'
         })
-        logger.debug(f"LombardAPI initialized with address: {self.address}, chain_id: {self.chain_id}")
         self.base_url = base_url
         if not CAPTCHA_API_KEY:
             raise KeyError("You haven't provided the neccessary API KEY for captcha solving module! Terminating...")
         self.captcha_solver = CaptchaSolver(CAPTCHA_API_KEY)
+        if proxy:
+            logger.info(f"Setting proxy for LombardAPI: {proxy}")
+            proxies = {
+                'http': f'http://{proxy}',
+                'https': f'http://{proxy}'
+            }
+            self.session.proxies.update(proxies)
+        else:
+            logger.info("No proxy provided for LombardAPI")
+        logger.debug(f"LombardAPI initialized with address: {self.address}, chain_id: {self.chain_id}")
         
 
     def _generate_signature(self) -> str:
@@ -209,10 +219,10 @@ class LombardAPI:
             Exception: If the API call fails.
         """
         logger.info("Retrieving BTC deposits")
-        data = self._make_request('GET', f'/api/v1/deposits/{self.address}/{self.chain_id}')
-        deposits = data.get('deposits', [])
+        data = self._make_request('GET', '/api/v1/address/outputs', params={'address': self.address})
+        deposits = data.get('outputs', [])
         logger.info(f"Retrieved {len(deposits)} BTC deposits")
-        logger.debug(f"BTC deposits: {deposits}")
+        logger.debug(f"BTC last deposit: {deposits[-1]}")
         return deposits
 
     def get_lbtc_exchange_rate(self) -> float:

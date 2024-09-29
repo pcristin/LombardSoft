@@ -84,13 +84,14 @@ class OKX_API:
             logger.debug(f"Result for withdraw: {withdraw_obj}")
             if withdraw_obj['code'] == '0':
                 withdraw_id = withdraw_obj['data'][0]['wdId']
+                logger.info(f"Withdrawal initiated. Withdrawal ID: {withdraw_id}")
+                return withdraw_id
             else:
                 logger.error(f"Error withdrawing funds with code: {withdraw_obj['code']} and msg: {withdraw_obj['msg']}")
                 return None
         except Exception as e:
             logger.error(f"Error withdrawing funds: {e}")
             return None
-        return withdraw_id
 
     def get_withdrawal_status(self, withdraw_id: str) -> Union[str, None]:
         """
