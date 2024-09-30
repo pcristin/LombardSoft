@@ -11,7 +11,7 @@ file_handler.setLevel(logging.DEBUG)
 
 # Create a console handler with colorlog
 console_handler = colorlog.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)  # Set to INFO level
 
 # Create a formatter
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

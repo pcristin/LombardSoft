@@ -139,7 +139,7 @@ def wait_for_confirmations(account: SoftAccount):
     raise Exception("Timed out waiting for BTC deposit confirmations")
 
 def mint_lbtc(account: SoftAccount):
-    logger.info("Minting LBTC")
+    logger.info(f"Minting LBTC for account: {account.address}")
     web3 = get_web3_instance(account)
 
     lbtc_ops = LBTCOps(web3=web3, account=account)
@@ -258,7 +258,7 @@ def load_abi(filename: str):
     return abi
 
 def process_account(account: SoftAccount, parser: UserSettingsParser, status_file: str):
-    logger.info(f"Processing account with private key: {account.settings['private_key']}")
+    logger.info(f"Processing account with public address: {account.address}")
     try:
         if account.status == AccountStatus.INIT:
             if account.settings['generate_btc_address'] == 1:
@@ -275,6 +275,10 @@ def process_account(account: SoftAccount, parser: UserSettingsParser, status_fil
                     logger.info(f"Generated BTC address for account. Please whitelist this address on your exchange and rerun the software.")
                     # Save status
                     parser.save_status(status_file)
+                    # Update the status to BTC_ADDRESS_GENERATED (hope that user will whitelist it)
+                    account.update_status(AccountStatus.BTC_ADDRESS_GENERATED)
+                    # Save status
+                    parser.save_status(status_file)
                     # Stop processing this account further
                     return
             else:
@@ -286,7 +290,33 @@ def process_account(account: SoftAccount, parser: UserSettingsParser, status_fil
             logger.info(f"Please whitelist the generated BTC address on your exchange and rerun the software.")
             return
 
-        # Proceed with the rest of the processing steps...
+        if account.status == AccountStatus.BTC_ADDRESS_GENERATED:
+            deposit_btc(account)
+            account.update_status(AccountStatus.BTC_DEPOSIT_INITIATED)
+
+        if account.status == AccountStatus.BTC_DEPOSIT_INITIATED:
+            wait_for_confirmations(account)
+            account.update_status(AccountStatus.BTC_CONFIRMATIONS_PENDING)
+
+        if account.status == AccountStatus.BTC_CONFIRMATIONS_PENDING:
+            mint_lbtc(account)
+            account.update_status(AccountStatus.LBTC_MINTED)
+
+        if account.status == AccountStatus.LBTC_MINTED:
+            confirm_lbtc_mint(account)
+            account.update_status(AccountStatus.LBTC_MINT_CONFIRMATION)
+
+        # if account.status == AccountStatus.LBTC_MINT_CONFIRMATION:
+        #     if account.settings['restaking_LBTC'] == 1:
+        #         restake_lbtc(account)
+        #         account.update_status(AccountStatus.LBTC_RESTAKED)
+        #     else:
+        #         account.update_status(AccountStatus.COMPLETED)
+
+        # if account.status == AccountStatus.LBTC_RESTAKED:
+        #     confirm_restake(account)
+        #     account.update_status(AccountStatus.LBTC_RESTAKED_CONFIRMATION)
+        #     account.update_status(AccountStatus.COMPLETED)
 
         # Remember to save the status after processing
         parser.save_status(status_file)
@@ -320,7 +350,7 @@ def update_btc_address_in_excel(account: SoftAccount):
         index = index[0]  # Get the first matching index
 
         # Update the 'btc_address' column in the 'Lombard' sheet
-        lombard_df.at[index, 'btc_address'] = account.btc_address
+        lombard_df.at[index, 'btc_address'] = str(account.btc_address)
 
         # Write back to the Excel file
         with pd.ExcelWriter(settings_file, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:

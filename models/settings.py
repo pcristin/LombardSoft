@@ -8,6 +8,10 @@ import re
 import json
 import os
 from models.status_enum import AccountStatus
+from eth_account import Account
+import secrets
+from openpyxl import load_workbook
+import numpy as np
 
 class UserSettingsParser:
     """
@@ -46,8 +50,8 @@ class UserSettingsParser:
                 main_row = main_df.loc[index]
                 lombard_row = lombard_df.loc[index]
 
-                # Parse and validate the account settings
-                account_settings = self.parse_account_settings(main_row, lombard_row, index + 2)  # +2 for Excel row number
+            # Parse and validate the account settings
+                account_settings = self.parse_account_settings(main_row, lombard_row, index + 2, main_df, index)  # +2 for Excel row number
                 soft_account = SoftAccount(account_settings)
                 self.accounts.append(soft_account)
 
@@ -55,7 +59,7 @@ class UserSettingsParser:
             logger.error(f"Error loading settings: {e}")
             raise Exception(f"Error loading settings: {e}")
 
-    def parse_account_settings(self, main_row: pd.Series, lombard_row: pd.Series, row_number: int) -> Dict[str, Any]:
+    def parse_account_settings(self, main_row: pd.Series, lombard_row: pd.Series, row_number: int, main_df: pd.DataFrame, df_index: int) -> Dict[str, Any]:
         """
         Parses and validates the settings for a single account.
 
@@ -78,7 +82,17 @@ class UserSettingsParser:
                 raise ValueError(f"Row {row_number}: 'private_key' is required.")
             if not isinstance(private_key, str):
                 raise ValueError(f"Row {row_number}: 'private_key' must be a string.")
-            account['private_key'] = private_key
+            if private_key.strip().lower() == 'gen':
+                logger.info(f"Row {row_number}: Generating new EVM wallet.")
+                # Generate new EVM wallet
+                new_account = Account.create(secrets.token_hex(32))
+                generated_private_key = '0x' + str(new_account.key.hex())
+                account['private_key'] = generated_private_key
+                # Write the generated private key back to the Excel file
+                self.update_private_key_in_excel(main_df, df_index, generated_private_key)
+                logger.info(f"Generated new EVM wallet for row {row_number}.")
+            else:
+                account['private_key'] = private_key
 
             # **NEW**: Parse 'proxy' (optional)
             # 1.b. 'proxy'
@@ -99,9 +113,9 @@ class UserSettingsParser:
             if pd.isna(max_gas_gwei):
                 account['max_gas_gwei'] = None  # No limitation
             else:
-                if not isinstance(max_gas_gwei, (int, float)):
-                    raise ValueError(f"Row {row_number}: 'max_gas_gwei' must be an integer or empty.")
-                account['max_gas_gwei'] = int(max_gas_gwei)
+                if max_gas_gwei is not None and not isinstance(max_gas_gwei, (np.integer)):
+                    raise ValueError(f"Row {row_number}: 'max_gas_gwei' must be an integer or empty. The current type is {type(max_gas_gwei)}")
+                account['max_gas_gwei'] = max_gas_gwei
 
             # 1.d. 'exchange' (required)
             exchange = main_row.get('exchange')
@@ -162,7 +176,7 @@ class UserSettingsParser:
                 raise ValueError(f"Row {row_number}: 'min_BTC' is required.")
             if not isinstance(min_BTC, (int, float)):
                 raise ValueError(f"Row {row_number}: 'min_BTC' must be a float.")
-            if min_BTC <= 0.0002:
+            if min_BTC < 0.0002:
                 raise ValueError(f"Row {row_number}: 'min_BTC' must be greater than 0.0002.")
             account['min_BTC'] = float(min_BTC)
 
@@ -216,6 +230,43 @@ class UserSettingsParser:
 
         logger.debug(f"Parsed account settings for row {row_number}: {account}")
         return account
+    
+    def update_private_key_in_excel(self, main_df: pd.DataFrame, df_index: int, private_key: str):
+        """
+        Updates the private key in the 'Soft_settings.xlsx' file for the given account.
+
+        Args:
+            main_df (pd.DataFrame): The DataFrame for the 'Main' sheet.
+            df_index (int): The index of the current row in the DataFrame.
+        private_key (str): The generated private key to write back.
+    """
+        logger.info("Updating private key in Soft_settings.xlsx")
+        settings_file = self.file_path
+        try:
+            # Load the workbook
+            wb = load_workbook(settings_file)
+            ws = wb['Main']
+
+            # Find the column index for 'private_key'
+            header = [cell.value for cell in ws[1]]  # Get header row values
+            try:
+                private_key_col_idx = header.index('private_key') + 1  # +1 because openpyxl is 1-indexed
+            except ValueError:
+                raise Exception("Column 'private_key' not found in 'Main' sheet.")
+
+            # Update the cell value
+            # df_index corresponds to the DataFrame index, which starts from 0
+            # Excel rows start from 1, with the header at row 1
+            excel_row = df_index + 2  # +2 accounts for header row and zero-based index
+
+            ws.cell(row=excel_row, column=private_key_col_idx, value=private_key)
+
+            # Save the workbook
+            wb.save(settings_file)
+            logger.info("Private key updated in Soft_settings.xlsx")
+        except Exception as e:
+            logger.error(f"Error updating private key in Soft_settings.xlsx: {e}")
+            raise
 
     def get_accounts(self) -> List[SoftAccount]:
         """
@@ -256,5 +307,11 @@ class UserSettingsParser:
         """
         logger.info(f"Saving account statuses to {status_file}")
         status_data = [account.to_dict() for account in self.accounts]
+        # Convert int64 to int
+        def convert_int64(obj):
+            if isinstance(obj, np.integer):
+                return int(obj)
+            raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
+
         with open(status_file, 'w') as f:
-            json.dump(status_data, f, indent=4)
+            json.dump(status_data, f, indent=4, default=convert_int64)

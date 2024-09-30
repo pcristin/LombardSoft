@@ -11,3 +11,5 @@ sdks/captcha_sdk/captcha_test.py
 .venv
 sdks/exchanges_sdk/tests_sdk.py
 utils/logs
+~$Soft_settings.xlsx
+status.json
