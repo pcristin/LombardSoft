@@ -13,3 +13,4 @@ sdks/exchanges_sdk/tests_sdk.py
 utils/logs
 ~$Soft_settings.xlsx
 status.json
+sdks/lombard_sdk/__pycache__
