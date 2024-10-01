@@ -7,8 +7,8 @@ import json
 import time
 from sdks.lombard_sdk.api import LombardAPI
 from models.soft_account import SoftAccount
-from hexbytes import HexBytes  # Add this import
-
+from hexbytes import HexBytes 
+import asyncio
 def load_abi(filename):
     abi_path = os.path.join(os.path.dirname(__file__), 'abi', filename)
     with open(abi_path, 'r') as abi_file:
@@ -20,12 +20,18 @@ class LBTCOps:
         self.web3 = web3
         self.private_key = account.settings['private_key']
         self.account_address = self.web3.eth.account.from_key(self.private_key).address
-        self.lbtc_contract_address = '0x8236a87084f8b84306f72007f36f2618a5634494'  # LBTC token contract address
         self.lbtc_abi = load_abi('lbtc_token_contract.json')  # Ensure the ABI file is in the 'abi' directory
-        self.lbtc_contract_address = web3.to_checksum_address(self.lbtc_contract_address)  # Ensure address is checksummed
+        self.defi_vault_abi = load_abi('defi_vault_contract.json')
+        self.lbtc_contract_address = web3.to_checksum_address('0x8236a87084f8b84306f72007f36f2618a5634494')  # Ensure address is checksummed
         self.lbtc_contract = self.web3.eth.contract(address=self.lbtc_contract_address, abi=self.lbtc_abi)
+        self.defi_vault_address = web3.to_checksum_address('0x2eA43384F1A98765257bc6Cb26c7131dEbdEB9B3')  # Replace with actual vault contract address
+        self.defi_vault_contract = self.web3.eth.contract(address=self.defi_vault_address, abi=self.defi_vault_abi)
         self.account = account
         logger.info(f"LBTCOps initialized for account: {self.account_address}")
+        self.lombard_api = LombardAPI(
+            private_key=self.private_key,
+            proxy=self.account.settings.get('proxy')  # Pass the proxy if provided
+        )
 
     def claim_lbtc(self) -> str:
         """
@@ -39,14 +45,8 @@ class LBTCOps:
         """
         logger.info("Preparing to mint LBTC")
 
-        # Initialize LombardAPI to get deposit data
-        lombard_api = LombardAPI(
-            private_key=self.private_key,
-            proxy=self.account.settings.get('proxy')  # Pass the proxy if provided
-        )
-
         # Get the latest deposit data
-        deposits = lombard_api.get_deposits_by_address()
+        deposits = self.lombard_api.get_deposits_by_address()
         if not deposits:
             raise Exception("No deposits found for this account")
 
@@ -115,3 +115,77 @@ class LBTCOps:
         except Exception as e:
             logger.error(f"Error waiting for transaction receipt: {e}")
             raise
+    
+    async def approve_lbtc(self, restaking_address: str):
+        """
+        Approves LBTC by calling the approve function of the LBTC token contract.
+
+        Returns:
+            str: The transaction hash of the approve transaction.
+
+        Raises:
+            Exception: If the approve fails.
+        """ 
+        logger.info("Preparing to approve LBTC")
+
+        # Get the latest deposit data
+        amount = self.lbtc_contract.functions.balanceOf(self.account_address).call()
+
+        if amount == 0:
+            raise Exception("No LBTC balance available for restaking")
+
+        while self.web3.eth.gas_price > self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'):
+            logger.info("Gas price is too high. Waiting for 60 seconds")
+            await asyncio.sleep(60)
+
+        # Approve LBTC transfer to vault
+        nonce = self.web3.eth.get_transaction_count(self.account_address)
+        approve_tx = self.lbtc_contract.functions.approve(Web3.to_checksum_address(restaking_address), amount).build_transaction({
+            'from': self.account_address,
+            'nonce': nonce,
+            'gas': 100000,
+            'gasPrice': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei')
+        })
+        signed_approve_tx = self.web3.eth.account.sign_transaction(approve_tx, private_key=self.private_key)
+        approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.rawTransaction)
+        self.web3.eth.wait_for_transaction_receipt(approve_tx_hash)
+        logger.info(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash.hex()}")
+        return approve_tx_hash.hex()
+    
+    async def restake_lbtc_defi_vault(self, restaking_address: str):
+        """
+        Restakes LBTC by calling the restake function of the LBTC token contract.
+
+        Returns:
+            str: The transaction hash of the restake transaction.
+
+        Raises:
+            Exception: If the restake fails.
+        """
+        logger.info("Preparing to restake LBTC")
+
+        amount = self.lbtc_contract.functions.balanceOf(self.account_address).call()
+
+        if amount == 0:
+            raise Exception("No LBTC balance available for restaking")
+
+        # Restake LBTC to vault
+        nonce = self.web3.eth.get_transaction_count(self.account_address)
+        while self.web3.eth.gas_price > self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'):
+            logger.info("Gas price is too high. Waiting for 60 seconds")
+            await asyncio.sleep(60)
+        restake_tx = self.defi_vault_contract.functions.Deposit(
+            self.lbtc_contract_address,
+            amount,
+            0
+        ).build_transaction({
+            'from': self.account_address,
+            'nonce': nonce,
+            'gas': 100000,
+            'gasPrice': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei')
+        })
+        signed_restake_tx = self.web3.eth.account.sign_transaction(restake_tx, private_key=self.private_key)
+        restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.rawTransaction)
+        self.web3.eth.wait_for_transaction_receipt(restake_tx_hash)
+        logger.info(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash.hex()}")
+        return restake_tx_hash.hex()

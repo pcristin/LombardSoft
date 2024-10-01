@@ -19,8 +19,8 @@ class SoftAccount:
             self.settings = settings
             self.status = status or AccountStatus.INIT
             self.btc_address = settings.get('btc_address')  # This will be updated later if generated
-            self.withdrawal_id: Union[Dict, None] = None  # For tracking withdrawals
-            self.transaction_hash: Union[Dict, None] = None  # For tracking blockchain transactions
+            self.withdrawal_id: Union[str, None] = None  # For tracking withdrawals
+            self.transaction_hash: Union[str, None] = None  # For tracking blockchain transactions
             logger.debug(f"SoftAccount initialized with status {self.status}")
             self.address = Account.from_key(settings['private_key']).address
         except ValueError as e:
@@ -51,7 +51,7 @@ class SoftAccount:
             'withdrawal_id': self.withdrawal_id,
             'transaction_hash': self.transaction_hash,
         }
-
+    
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
         """

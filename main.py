@@ -18,8 +18,8 @@ import requests
 from hexbytes import HexBytes
 import pandas as pd
 from openpyxl import load_workbook
-
-PROVIDER_URL = "" # ETHEREUM_RPC_URL
+import asyncio
+PROVIDER_URL = "https://1rpc.io/eth" # ETHEREUM_RPC_URL
 
 def get_web3_instance(account: SoftAccount) -> Web3:
     """
@@ -99,42 +99,38 @@ def deposit_btc(account: SoftAccount):
         )
         # Withdraw BTC
         if btc_address:
-            withdrawal_id = exchange_api.withdraw(amount=amount_str, address=btc_address)
+            withdrawal_id = exchange_api.withdraw(amount=amount_str, address=btc_address)['data']['orderId']
         else:
             raise ValueError("BTC address cannot be None")
     else:
         raise Exception(f"Unsupported exchange: {exchange_name}")
 
     if withdrawal_id:
-        account.withdrawal_id = {"withdrawal_id": withdrawal_id}
+        account.withdrawal_id = withdrawal_id
         logger.info(f"BTC withdrawal initiated. Withdrawal ID: {withdrawal_id}")
     else:
         raise Exception("Failed to initiate BTC withdrawal")
 
-def wait_for_confirmations(account: SoftAccount):
+async def wait_for_confirmations(account: SoftAccount):
     logger.info("Waiting for BTC deposit confirmations")
     lombard_api = LombardAPI(
         private_key=account.settings['private_key'],
         proxy=account.settings.get('proxy')  # Pass the proxy
     )
-    max_confirmations = 6
-    check_interval = 300  # Check every 5 minutes
-    max_checks = 72  # Wait up to 6 hours
+    check_interval = 600  # Check every 10 minutes
+    max_checks = 36  # Wait up to 3 hours
 
     for _ in range(max_checks):
         deposits = lombard_api.get_deposits_by_address()
         if deposits:
             for deposit in deposits:
                 if deposit['btc_address'] == account.btc_address:
-                    confirmations = deposit.get('confirmations', 0)
-                    logger.info(f"Deposit confirmations: {confirmations}")
-                    if confirmations >= max_confirmations:
-                        logger.info("Required confirmations reached")
-                        return
+                    logger.info("Required confirmations reached")
+                    return
         else:
             logger.info("No deposits found yet")
 
-        time.sleep(check_interval)
+        await asyncio.sleep(check_interval)
 
     raise Exception("Timed out waiting for BTC deposit confirmations")
 
@@ -146,7 +142,7 @@ def mint_lbtc(account: SoftAccount):
     tx_hash = lbtc_ops.claim_lbtc()
 
     if tx_hash:
-        account.transaction_hash = {"hash": tx_hash}  # Wrap tx_hash in a dictionary    
+        account.transaction_hash = tx_hash # Wrap tx_hash in a dictionary    
         logger.info(f"LBTC mint transaction initiated. Transaction hash: {tx_hash}")
     else:
         raise Exception("Failed to mint LBTC")
@@ -161,7 +157,7 @@ def confirm_lbtc_mint(account: SoftAccount):
 
     # Ensure tx_hash is a string or bytes
     if isinstance(tx_hash, dict):
-        tx_hash = tx_hash['hash']  # Extract the hash if tx_hash is a dictionary
+        tx_hash = tx_hash  # Extract the hash if tx_hash is a dictionary
     tx_hash_bytes = HexBytes(tx_hash)  # Ensure tx_hash is in a compatible format
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash_bytes, timeout=600)
     if receipt["status"] == 1:
@@ -169,74 +165,49 @@ def confirm_lbtc_mint(account: SoftAccount):
     else:
         raise Exception("LBTC minting transaction failed")
 
-# def restake_lbtc(account: SoftAccount):
-#     logger.info("Restaking LBTC")
-#     selected_vault = account.settings['selected_vault']
-#     web3 = get_web3_instance(account)
+async def restake_lbtc(account: SoftAccount):
+    logger.info("Restaking LBTC")
+    selected_vault = account.settings['selected_vault']
+    web3 = get_web3_instance(account)
 
-#     if selected_vault == 'Defi_Vault':
-#         tx_hash = restake_to_defi_vault(web3, account)
-#     elif selected_vault == 'Etherfi':
-#         tx_hash = restake_to_etherfi(web3, account)
-#     elif selected_vault == 'Pendle':
-#         tx_hash = restake_to_pendle(web3, account)
-#     else:
-#         raise Exception(f"Unknown vault: {selected_vault}")
+    if selected_vault == 'Defi_Vault':
+        tx_hash = await restake_to_defi_vault(web3, account)
+    # elif selected_vault == 'Etherfi':
+    #     tx_hash = restake_to_etherfi(web3, account)
+    # elif selected_vault == 'Pendle':
+    #     tx_hash = restake_to_pendle(web3, account)
+    else:
+        raise Exception(f"Unknown vault: {selected_vault}")
 
-#     if tx_hash:
-#         account.transaction_hash = {"hash": tx_hash}  # Wrap tx_hash in a dictionary
-#         logger.info(f"LBTC restake transaction initiated. Transaction hash: {tx_hash}")
-#     else:
-#         raise Exception("Failed to restake LBTC")
+    if tx_hash:
+        account.transaction_hash = tx_hash
+        logger.info(f"LBTC restake transaction initiated. Transaction hash: {tx_hash}")
+    else:
+        raise Exception("Failed to restake LBTC")
 
-# def confirm_restake(account: SoftAccount):
-#     logger.info("Confirming LBTC restake transaction")
-#     web3 = get_web3_instance(account)
+def confirm_restake(account: SoftAccount):
+    logger.info("Confirming LBTC restake transaction")
+    web3 = get_web3_instance(account)
 
-#     tx_hash = account.transaction_hash
-#     if not tx_hash:
-#         raise Exception("No transaction hash found for LBTC restaking")
+    tx_hash = account.transaction_hash
+    if not tx_hash:
+        raise Exception("No transaction hash found for LBTC restaking")
 
-#     tx_hash_bytes = HexBytes(tx_hash)  # Ensure tx_hash is in a compatible format
-#     receipt = web3.eth.wait_for_transaction_receipt(tx_hash_bytes, timeout=600)
-#     if receipt["status"] == 1:
-#         logger.info("LBTC restaking transaction confirmed")
-#     else:
-#         raise Exception("LBTC restaking transaction failed")
+    tx_hash_bytes = HexBytes(tx_hash)  # Ensure tx_hash is in a compatible format
+    receipt = web3.eth.wait_for_transaction_receipt(tx_hash_bytes, timeout=600)
+    if receipt["status"] == 1:
+        logger.info("LBTC restaking transaction confirmed")
+    else:
+        raise Exception("LBTC restaking transaction failed")
 
-# def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[str]:
-#     logger.info("Restaking LBTC to Defi_Vault")
-#     private_key = account.settings['private_key']
-#     account_address = web3.eth.account.from_key(private_key).address
-
-#     lbtc_token_address = '0xYourLBTCContractAddress'  # Replace with actual LBTC contract address
-#     defi_vault_address = '0xDefiVaultContractAddress'  # Replace with actual vault contract address
-
-#     # Load ABIs
-#     lbtc_abi = load_abi('lbtc_token_contract.json')
-#     vault_abi = load_abi('defi_vault_contract.json')
-
-#     # Create contract instances
-#     lbtc_contract = web3.eth.contract(address=web3.to_checksum_address(lbtc_token_address), abi=lbtc_abi)
-#     vault_contract = web3.eth.contract(address=web3.to_checksum_address(defi_vault_address), abi=vault_abi)
-
-#     # Amount to restake (adjust as needed)
-#     amount = lbtc_contract.functions.balanceOf(account_address).call()
-
-#     if amount == 0:
-#         raise Exception("No LBTC balance available for restaking")
-
-#     # Approve LBTC transfer to vault
-#     nonce = web3.eth.get_transaction_count(account_address)
-#     approve_tx = lbtc_contract.functions.approve(defi_vault_address, amount).build_transaction({
-#         'from': account_address,
-#         'nonce': nonce,
-#         'gas': 100000,
-#         'gasPrice': web3.to_wei(account.settings.get('max_gas_gwei', 50), 'gwei')
-#     })
-#     signed_approve_tx = web3.eth.account.sign_transaction(approve_tx, private_key=private_key)
-#     approve_tx_hash = web3.eth.send_raw_transaction(signed_approve_tx.rawTransaction)
-#     web3.eth.wait_for_transaction_receipt(approve_tx_hash)
+async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[str]:
+    logger.info("Restaking LBTC to Defi_Vault")
+    lbtc_ops = LBTCOps(web3=web3, account=account)
+    approve_tx_hash = await lbtc_ops.approve_lbtc(lbtc_ops.defi_vault_address)
+    logger.info(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash}")
+    restake_tx_hash = await lbtc_ops.restake_lbtc_defi_vault(lbtc_ops.defi_vault_address)
+    logger.info(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash}")
+    return restake_tx_hash
 
 
 # def restake_to_etherfi(web3: Web3, account: SoftAccount) -> Optional[str]:
@@ -257,7 +228,7 @@ def load_abi(filename: str):
         abi = json.load(abi_file)
     return abi
 
-def process_account(account: SoftAccount, parser: UserSettingsParser, status_file: str):
+async def process_account(account: SoftAccount, parser: UserSettingsParser, status_file: str):
     logger.info(f"Processing account with public address: {account.address}")
     try:
         if account.status == AccountStatus.INIT:
@@ -295,7 +266,7 @@ def process_account(account: SoftAccount, parser: UserSettingsParser, status_fil
             account.update_status(AccountStatus.BTC_DEPOSIT_INITIATED)
 
         if account.status == AccountStatus.BTC_DEPOSIT_INITIATED:
-            wait_for_confirmations(account)
+            await wait_for_confirmations(account)
             account.update_status(AccountStatus.BTC_CONFIRMATIONS_PENDING)
 
         if account.status == AccountStatus.BTC_CONFIRMATIONS_PENDING:
@@ -306,17 +277,17 @@ def process_account(account: SoftAccount, parser: UserSettingsParser, status_fil
             confirm_lbtc_mint(account)
             account.update_status(AccountStatus.LBTC_MINT_CONFIRMATION)
 
-        # if account.status == AccountStatus.LBTC_MINT_CONFIRMATION:
-        #     if account.settings['restaking_LBTC'] == 1:
-        #         restake_lbtc(account)
-        #         account.update_status(AccountStatus.LBTC_RESTAKED)
-        #     else:
-        #         account.update_status(AccountStatus.COMPLETED)
+        if account.status == AccountStatus.LBTC_MINT_CONFIRMATION:
+            if account.settings['restaking_LBTC'] == 1:
+                await restake_lbtc(account)
+                account.update_status(AccountStatus.LBTC_RESTAKED)
+            else:
+                account.update_status(AccountStatus.COMPLETED)
 
-        # if account.status == AccountStatus.LBTC_RESTAKED:
-        #     confirm_restake(account)
-        #     account.update_status(AccountStatus.LBTC_RESTAKED_CONFIRMATION)
-        #     account.update_status(AccountStatus.COMPLETED)
+        if account.status == AccountStatus.LBTC_RESTAKED:
+            confirm_restake(account)
+            account.update_status(AccountStatus.LBTC_RESTAKED_CONFIRMATION)
+            account.update_status(AccountStatus.COMPLETED)
 
         # Remember to save the status after processing
         parser.save_status(status_file)
@@ -366,7 +337,7 @@ def update_btc_address_in_excel(account: SoftAccount):
         logger.error(f"Error updating BTC address in Soft_settings.xlsx: {e}")
         raise
 
-def main():
+async def main():
     settings_file = './Soft_settings.xlsx'
     status_file = './status.json'
 
@@ -380,7 +351,7 @@ def main():
 
     for account in accounts:
         try:
-            process_account(account, parser, status_file)
+            await process_account(account, parser, status_file)
             # Status is saved within process_account
         except Exception as e:
             logger.error(f"Error processing account: {e}")
@@ -388,4 +359,4 @@ def main():
             continue  # Proceed to the next account
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())

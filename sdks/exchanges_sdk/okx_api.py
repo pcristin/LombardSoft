@@ -24,8 +24,7 @@ class OKX_API:
         self.api_key = api_key
         self.secret_key = secret_key
         self.passphrase = passphrase
-        self.flag = '0'
-        self.Funding = Funding.FundingAPI(self.api_key, self.secret_key, self.passphrase, False, flag=self.flag)
+        self.Funding = Funding.FundingAPI(self.api_key, self.secret_key, self.passphrase, False, flag='0')
         self.PublicData = PublicData.PublicAPI(flag='0')
         logger.debug("OKX_API initialized")
 
@@ -73,7 +72,7 @@ class OKX_API:
         Raises:
             Exception: If the API call fails.
         """
-
+        withdraw_id: Union[str, None] = None
         logger.info("Withdrawing funds")
         fee = self.get_withdrawal_fee()
         if fee is None:
