@@ -33,7 +33,7 @@ class LBTCOps:
             proxy=self.account.settings.get('proxy')  # Pass the proxy if provided
         )
 
-    def claim_lbtc(self) -> str:
+    async def claim_lbtc(self) -> str:
         """
         Claims LBTC by calling the mint function of the LBTC token contract.
 
@@ -71,7 +71,7 @@ class LBTCOps:
             max_gas_wei = self.web3.to_wei(max_gas_gwei, 'gwei')
             while gas_price > max_gas_wei:
                 logger.info(f"Gas price {self.web3.from_wei(gas_price, 'gwei')} gwei is higher than max allowed {max_gas_gwei} gwei. Waiting...")
-                time.sleep(60)  # Wait 1 minute before checking again
+                await asyncio.sleep(60)  # Wait 1 minute before checking again
                 gas_price = self.web3.eth.gas_price
 
         # Build the transaction
@@ -79,8 +79,8 @@ class LBTCOps:
         transaction = self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).build_transaction({
             'from': self.account_address,
             'nonce': nonce,
-            'gasPrice': gas_price,
-            # Estimate gas
+            'maxFeePerGas': gas_price,
+            'maxPriorityFeePerGas': self.web3.to_wei(2, 'gwei'),
             'gas': self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).estimate_gas({'from': self.account_address}),
         })
 
@@ -134,17 +134,26 @@ class LBTCOps:
         if amount == 0:
             raise Exception("No LBTC balance available for restaking")
 
-        while self.web3.eth.gas_price > self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'):
-            logger.info("Gas price is too high. Waiting for 60 seconds")
-            await asyncio.sleep(60)
+        # Wait until the gas price is acceptable
+        max_gas_gwei = self.account.settings.get('max_gas_gwei')
+        gas_price = self.web3.eth.gas_price
+        logger.info(f"Current gas price: {self.web3.from_wei(gas_price, 'gwei')} gwei")
+
+        if max_gas_gwei:
+            max_gas_wei = self.web3.to_wei(max_gas_gwei, 'gwei')
+            while gas_price > max_gas_wei:
+                logger.info(f"Gas price {self.web3.from_wei(gas_price, 'gwei')} gwei is higher than max allowed {max_gas_gwei} gwei. Waiting...")
+                await asyncio.sleep(60)  # Wait 1 minute before checking again
+                gas_price = self.web3.eth.gas_price
 
         # Approve LBTC transfer to vault
         nonce = self.web3.eth.get_transaction_count(self.account_address)
         approve_tx = self.lbtc_contract.functions.approve(Web3.to_checksum_address(restaking_address), amount).build_transaction({
             'from': self.account_address,
             'nonce': nonce,
-            'gas': 100000,
-            'gasPrice': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei')
+            'gas': self.lbtc_contract.functions.approve(Web3.to_checksum_address(restaking_address), amount).estimate_gas({'from': self.account_address}),
+            'maxFeePerGas': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'),
+            'maxPriorityFeePerGas': self.web3.to_wei(2, 'gwei')
         })
         signed_approve_tx = self.web3.eth.account.sign_transaction(approve_tx, private_key=self.private_key)
         approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.rawTransaction)
@@ -171,9 +180,18 @@ class LBTCOps:
 
         # Restake LBTC to vault
         nonce = self.web3.eth.get_transaction_count(self.account_address)
-        while self.web3.eth.gas_price > self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'):
-            logger.info("Gas price is too high. Waiting for 60 seconds")
-            await asyncio.sleep(60)
+        # Wait until the gas price is acceptable
+        max_gas_gwei = self.account.settings.get('max_gas_gwei')
+        gas_price = self.web3.eth.gas_price
+        logger.info(f"Current gas price: {self.web3.from_wei(gas_price, 'gwei')} gwei")
+
+        if max_gas_gwei:
+            max_gas_wei = self.web3.to_wei(max_gas_gwei, 'gwei')
+            while gas_price > max_gas_wei:
+                logger.info(f"Gas price {self.web3.from_wei(gas_price, 'gwei')} gwei is higher than max allowed {max_gas_gwei} gwei. Waiting...")
+                await asyncio.sleep(60)  # Wait 1 minute before checking again
+                gas_price = self.web3.eth.gas_price
+        
         restake_tx = self.defi_vault_contract.functions.Deposit(
             self.lbtc_contract_address,
             amount,
@@ -181,8 +199,9 @@ class LBTCOps:
         ).build_transaction({
             'from': self.account_address,
             'nonce': nonce,
-            'gas': 100000,
-            'gasPrice': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei')
+            'gas': self.defi_vault_contract.functions.Deposit(self.lbtc_contract_address,amount,0).estimate_gas({'from': self.account_address}),
+            'maxFeePerGas': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'),
+            'maxPriorityFeePerGas': self.web3.to_wei(2, 'gwei')
         })
         signed_restake_tx = self.web3.eth.account.sign_transaction(restake_tx, private_key=self.private_key)
         restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.rawTransaction)

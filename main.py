@@ -134,12 +134,12 @@ async def wait_for_confirmations(account: SoftAccount):
 
     raise Exception("Timed out waiting for BTC deposit confirmations")
 
-def mint_lbtc(account: SoftAccount):
+async def mint_lbtc(account: SoftAccount):
     logger.info(f"Minting LBTC for account: {account.address}")
     web3 = get_web3_instance(account)
 
     lbtc_ops = LBTCOps(web3=web3, account=account)
-    tx_hash = lbtc_ops.claim_lbtc()
+    tx_hash = await lbtc_ops.claim_lbtc()
 
     if tx_hash:
         account.transaction_hash = tx_hash # Wrap tx_hash in a dictionary    
@@ -270,7 +270,7 @@ async def process_account(account: SoftAccount, parser: UserSettingsParser, stat
             account.update_status(AccountStatus.BTC_CONFIRMATIONS_PENDING)
 
         if account.status == AccountStatus.BTC_CONFIRMATIONS_PENDING:
-            mint_lbtc(account)
+            await mint_lbtc(account)
             account.update_status(AccountStatus.LBTC_MINTED)
 
         if account.status == AccountStatus.LBTC_MINTED:
