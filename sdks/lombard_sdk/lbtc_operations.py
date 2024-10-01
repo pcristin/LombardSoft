@@ -80,7 +80,7 @@ class LBTCOps:
             'from': self.account_address,
             'nonce': nonce,
             'maxFeePerGas': gas_price,
-            'maxPriorityFeePerGas': self.web3.to_wei(2, 'gwei'),
+            'maxPriorityFeePerGas': self.web3.eth.max_priority_fee,
             'gas': self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).estimate_gas({'from': self.account_address}),
         })
 
@@ -152,8 +152,8 @@ class LBTCOps:
             'from': self.account_address,
             'nonce': nonce,
             'gas': self.lbtc_contract.functions.approve(Web3.to_checksum_address(restaking_address), amount).estimate_gas({'from': self.account_address}),
-            'maxFeePerGas': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'),
-            'maxPriorityFeePerGas': self.web3.to_wei(2, 'gwei')
+            'maxFeePerGas': gas_price,
+            'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
         })
         signed_approve_tx = self.web3.eth.account.sign_transaction(approve_tx, private_key=self.private_key)
         approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.rawTransaction)
@@ -200,8 +200,8 @@ class LBTCOps:
             'from': self.account_address,
             'nonce': nonce,
             'gas': self.defi_vault_contract.functions.Deposit(self.lbtc_contract_address,amount,0).estimate_gas({'from': self.account_address}),
-            'maxFeePerGas': self.web3.to_wei(self.account.settings.get('max_gas_gwei', 50), 'gwei'),
-            'maxPriorityFeePerGas': self.web3.to_wei(2, 'gwei')
+            'maxFeePerGas': gas_price,
+            'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
         })
         signed_restake_tx = self.web3.eth.account.sign_transaction(restake_tx, private_key=self.private_key)
         restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.rawTransaction)
