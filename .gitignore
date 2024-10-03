@@ -6,7 +6,7 @@ manual_test.py
 */__pycache__
 .DS_Store
 sdks/captcha_sdk/captcha_test.py
-.env
+#.env
 .vscode
 .venv
 sdks/exchanges_sdk/tests_sdk.py
