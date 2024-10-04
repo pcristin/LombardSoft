@@ -228,7 +228,7 @@ class UserSettingsParser:
             logger.error(f"Error parsing 'Lombard' sheet: {ve}")
             raise ve
 
-        logger.debug(f"Parsed account settings for row {row_number}: {account}")
+        logger.debug(f"Parsed account settings for row {row_number}")
         return account
     
     def update_private_key_in_excel(self, main_df: pd.DataFrame, df_index: int, private_key: str):

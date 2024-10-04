@@ -124,7 +124,7 @@ async def wait_for_confirmations(account: SoftAccount):
         deposits = lombard_api.get_deposits_by_address()
         if deposits:
             for deposit in deposits:
-                if deposit['btc_address'] == account.btc_address:
+                if deposit['address'] == account.btc_address:
                     logger.info("Required confirmations reached")
                     return
         else:

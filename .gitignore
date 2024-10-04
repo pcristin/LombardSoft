@@ -3,7 +3,10 @@
 .idea
 tests
 manual_test.py
-*/__pycache__
+sdks/*/__pycache__
+models/__pycache__
+utils/__pycache__
+sdks/__pycache__
 .DS_Store
 sdks/captcha_sdk/captcha_test.py
 .env

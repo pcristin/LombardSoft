@@ -20,7 +20,7 @@ class LombardAPI:
     """
 
     def __init__(self, private_key: str, chain_id: int = CHAIN_ID, referral_id: str = REFERRAL_ID, 
-                 base_url: str = TESTNET_BASE_URL, proxy: Optional[str] = None):
+                 base_url: str = MAINNET_BASE_URL, proxy: Optional[str] = None):
         """
         Initializes the LombardAPI class.
 
@@ -28,7 +28,7 @@ class LombardAPI:
             private_key (str): Private key of the user's Ethereum account.
             chain_id (int, optional): The chain ID (1 for Ethereum Mainnet). Defaults to CHAIN_ID.
             referral_id (str, optional): Referral ID. Defaults to REFERRAL_ID.
-            base_url (str, optional): Base URL for the Lombard API. Defaults to TESTNET_BASE_URL/MAINNET_BASE_URL.
+            base_url (str, optional): Base URL for the Lombard API. Defaults to MAINNET_BASE_URL.
         """
         logger.info("Initializing LombardAPI")
         self.account = Account.from_key(private_key)
