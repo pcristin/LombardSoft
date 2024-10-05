@@ -124,11 +124,11 @@ async def wait_for_confirmations(account: SoftAccount):
         deposits = lombard_api.get_deposits_by_address()
         if deposits:
             for deposit in deposits:
-                if deposit['address'] == account.btc_address and deposit['claim_tx']:
+                if deposit['address'] == account.btc_address and 'notarization_wait_dur' in deposit:
+                    logger.info("Required confirmations not reached yet")
+                elif deposit['address'] == account.btc_address and 'raw_payload' in deposit and 'signature' in deposit:
                     logger.info("Required confirmations reached")
                     return
-                else:
-                    logger.info("Required confirmations not reached yet")
         else:
             logger.info("No deposits found yet")
 
@@ -205,7 +205,7 @@ def confirm_restake(account: SoftAccount):
 async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[str]:
     logger.info("Restaking LBTC to Defi_Vault")
     lbtc_ops = LBTCOps(web3=web3, account=account)
-    approve_tx_hash = await lbtc_ops.approve_lbtc(lbtc_ops.defi_vault_address)
+    approve_tx_hash = await lbtc_ops.approve_lbtc(web3.to_checksum_address("0x5401b8620E5FB570064CA9114fd1e135fd77D57c"))
     logger.info(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash}")
     restake_tx_hash = await lbtc_ops.restake_lbtc_defi_vault(lbtc_ops.defi_vault_address)
     logger.info(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash}")

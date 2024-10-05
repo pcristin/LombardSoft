@@ -89,7 +89,7 @@ class LBTCOps:
         signed_tx = self.web3.eth.account.sign_transaction(transaction, private_key=self.private_key)
 
         # Send the transaction
-        tx_hash = self.web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = self.web3.eth.send_raw_transaction(signed_tx.raw_transaction)
         logger.info(f"Mint transaction sent. Transaction hash: {tx_hash.hex()}")
 
         return tx_hash.hex()
@@ -157,7 +157,7 @@ class LBTCOps:
             'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
         })
         signed_approve_tx = self.web3.eth.account.sign_transaction(approve_tx, private_key=self.private_key)
-        approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.rawTransaction)
+        approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.raw_transaction)
         self.web3.eth.wait_for_transaction_receipt(approve_tx_hash)
         logger.info(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash.hex()}")
         return approve_tx_hash.hex()
@@ -193,19 +193,19 @@ class LBTCOps:
                 await asyncio.sleep(60)  # Wait 1 minute before checking again
                 gas_price = self.web3.eth.gas_price
         
-        restake_tx = self.defi_vault_contract.functions.Deposit(
+        restake_tx = self.defi_vault_contract.functions.deposit(
             self.lbtc_contract_address,
             amount,
             0
         ).build_transaction({
             'from': self.account_address,
             'nonce': nonce,
-            'gas': self.defi_vault_contract.functions.Deposit(self.lbtc_contract_address,amount,0).estimate_gas({'from': self.account_address}),
+            'gas': self.defi_vault_contract.functions.deposit(self.lbtc_contract_address,amount,0).estimate_gas({'from': self.account_address}),
             'maxFeePerGas': gas_price,
             'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
         })
         signed_restake_tx = self.web3.eth.account.sign_transaction(restake_tx, private_key=self.private_key)
-        restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.rawTransaction)
+        restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.raw_transaction)
         self.web3.eth.wait_for_transaction_receipt(restake_tx_hash)
         logger.info(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash.hex()}")
         return restake_tx_hash.hex()
