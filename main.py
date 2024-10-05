@@ -32,6 +32,7 @@ def get_web3_instance(account: SoftAccount) -> Web3:
     Returns:
         Web3: The initialized Web3 instance.
     """
+    logger.addFilter(AccountFilter(account.address))
     provider_url = PROVIDER_URL
     proxy = account.settings.get('proxy')
     if proxy:
