@@ -53,7 +53,7 @@ class LBTCOps:
 
         # Use the latest deposit
         latest_deposit = deposits[-1]
-        data = latest_deposit.get('rawPayload')
+        data = latest_deposit.get('raw_payload')
         proof_signature = latest_deposit.get('signature')
 
         if not data or not proof_signature:
