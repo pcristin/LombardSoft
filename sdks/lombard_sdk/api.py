@@ -8,7 +8,7 @@ from sdks.lombard_sdk.constants import TESTNET_BASE_URL, CHAIN_ID, REFERRAL_ID, 
 from sdks.captcha_sdk.captcha_solver import CaptchaSolver
 from dotenv import load_dotenv
 import os
-from utils.logger_config import logger
+from utils.logger_config import logger, AccountFilter
 
 load_dotenv()
 
@@ -30,9 +30,10 @@ class LombardAPI:
             referral_id (str, optional): Referral ID. Defaults to REFERRAL_ID.
             base_url (str, optional): Base URL for the Lombard API. Defaults to MAINNET_BASE_URL.
         """
-        logger.info("Initializing LombardAPI")
         self.account = Account.from_key(private_key)
         self.address = self.account.address
+        logger.addFilter(AccountFilter(self.address))
+        logger.info("Initializing LombardAPI")
         self.chain_id = chain_id
         self.referral_id = referral_id
         self.session = requests.Session()

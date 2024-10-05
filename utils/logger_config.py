@@ -12,6 +12,17 @@ if not os.path.exists(log_dir):
 log_filename = datetime.now().strftime("%H_%M %d_%m_%y") + '.log'
 log_filepath = os.path.join(log_dir, log_filename)
 
+# Custom filter to add account address to log records
+class AccountFilter(logging.Filter):
+    def __init__(self, account_address):
+        super().__init__()
+        self.account_address = account_address
+
+    def filter(self, record):
+        # Format the account address as first 5 and last 4 characters
+        record.account_address = f"{self.account_address[:5]}...{self.account_address[-4:]}"
+        return True
+
 # Set up logging
 logger = logging.getLogger('lombard_logger')
 logger.setLevel(logging.DEBUG)
@@ -25,9 +36,9 @@ console_handler = colorlog.StreamHandler()
 console_handler.setLevel(logging.INFO)  # Set to INFO level
 
 # Create a formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - (%(account_address)s): %(message)s')
 color_formatter = colorlog.ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "%(log_color)s%(asctime)s - %(levelname)s - (%(account_address)s): %(message)s",
     datefmt=None,
     reset=True,
     log_colors={
@@ -45,3 +56,7 @@ console_handler.setFormatter(color_formatter)
 # Add the handlers to the logger
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
+
+# Example usage: Add the filter with the account address
+# account_address = "0x1234567890abcdef1234567890abcdef12345678"
+# logger.addFilter(AccountFilter(account_address))

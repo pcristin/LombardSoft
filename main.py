@@ -19,6 +19,7 @@ from hexbytes import HexBytes
 import pandas as pd
 from openpyxl import load_workbook
 import asyncio
+from utils.logger_config import AccountFilter
 PROVIDER_URL = "https://1rpc.io/eth" # ETHEREUM_RPC_URL
 
 def get_web3_instance(account: SoftAccount) -> Web3:
@@ -50,6 +51,7 @@ def get_web3_instance(account: SoftAccount) -> Web3:
     return web3
 
 def generate_btc_address(account: SoftAccount) -> str:
+    logger.addFilter(AccountFilter(account.address))
     logger.info("Generating BTC address")
     lombard_api = LombardAPI(
         private_key=account.settings['private_key'],
@@ -70,6 +72,7 @@ def generate_btc_address(account: SoftAccount) -> str:
         raise Exception("Failed to generate BTC address")
 
 def deposit_btc(account: SoftAccount):
+    logger.addFilter(AccountFilter(account.address))
     logger.info("Initiating BTC deposit")
     exchange_name = account.settings['exchange']
     # Randomly generate BTC amount between min_BTC and max_BTC
@@ -112,6 +115,7 @@ def deposit_btc(account: SoftAccount):
         raise Exception("Failed to initiate BTC withdrawal")
 
 async def wait_for_confirmations(account: SoftAccount):
+    logger.addFilter(AccountFilter(account.address))
     logger.info("Waiting for BTC deposit confirmations")
     lombard_api = LombardAPI(
         private_key=account.settings['private_key'],
@@ -137,6 +141,7 @@ async def wait_for_confirmations(account: SoftAccount):
     raise Exception("Timed out waiting for BTC deposit confirmations")
 
 async def mint_lbtc(account: SoftAccount):
+    logger.addFilter(AccountFilter(account.address))
     logger.info(f"Minting LBTC for account: {account.address}")
     web3 = get_web3_instance(account)
 
@@ -168,6 +173,7 @@ def confirm_lbtc_mint(account: SoftAccount):
         raise Exception("LBTC minting transaction failed")
 
 async def restake_lbtc(account: SoftAccount):
+    logger.addFilter(AccountFilter(account.address))
     logger.info("Restaking LBTC")
     selected_vault = account.settings['selected_vault']
     web3 = get_web3_instance(account)
@@ -188,6 +194,7 @@ async def restake_lbtc(account: SoftAccount):
         raise Exception("Failed to restake LBTC")
 
 def confirm_restake(account: SoftAccount):
+    logger.addFilter(AccountFilter(account.address))
     logger.info("Confirming LBTC restake transaction")
     web3 = get_web3_instance(account)
 
@@ -203,6 +210,7 @@ def confirm_restake(account: SoftAccount):
         raise Exception("LBTC restaking transaction failed")
 
 async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[str]:
+    logger.addFilter(AccountFilter(account.address))
     logger.info("Restaking LBTC to Defi_Vault")
     lbtc_ops = LBTCOps(web3=web3, account=account)
     approve_tx_hash = await lbtc_ops.approve_lbtc(web3.to_checksum_address("0x5401b8620E5FB570064CA9114fd1e135fd77D57c"))
@@ -231,7 +239,9 @@ def load_abi(filename: str):
     return abi
 
 async def process_account(account: SoftAccount, parser: UserSettingsParser, status_file: str):
-    logger.info(f"Processing account with public address: {account.address}")
+    
+    logger.addFilter(AccountFilter(account.address))
+    logger.debug(f"Account status: {account.status.value}")
     try:
         if account.status == AccountStatus.INIT:
             if account.settings['generate_btc_address'] == 1:
@@ -303,6 +313,7 @@ def update_btc_address_in_excel(account: SoftAccount):
     """
     Updates the BTC address in the 'Soft_settings.xlsx' file for the given account.
     """
+    logger.addFilter(AccountFilter(account.address))
     logger.info("Updating BTC address in Soft_settings.xlsx")
     settings_file = './Soft_settings.xlsx'
     try:

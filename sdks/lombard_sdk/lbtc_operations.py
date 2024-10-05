@@ -11,7 +11,7 @@ from hexbytes import HexBytes
 import asyncio
 from typing import Union
 import random
-
+from utils.logger_config import AccountFilter
 def load_abi(filename):
     abi_path = os.path.join(os.path.dirname(__file__), "..", "..", "abi", filename)
     with open(abi_path, 'r') as abi_file:
@@ -30,7 +30,8 @@ class LBTCOps:
         self.defi_vault_address = web3.to_checksum_address('0x2eA43384F1A98765257bc6Cb26c7131dEbdEB9B3')  # Replace with actual vault contract address
         self.defi_vault_contract = self.web3.eth.contract(address=self.defi_vault_address, abi=self.defi_vault_abi)
         self.account = account
-        logger.info(f"LBTCOps initialized for account: {self.account_address}")
+        logger.addFilter(AccountFilter(self.account_address))
+        logger.info(f"LBTCOps initialized")
         self.lombard_api = LombardAPI(
             private_key=self.private_key,
             proxy=self.account.settings.get('proxy')  # Pass the proxy if provided
