@@ -219,8 +219,12 @@ class LombardAPI:
             Exception: If the API call fails.
         """
         logger.info("Retrieving BTC deposits")
-        data = self._make_request('GET', '/api/v1/address/outputs', params={'address': self.address})
-        deposits = data.get('outputs', [])
+        data = self._make_request('GET', f'/api/v1/address/outputs/{self.address}')
+        try:
+            deposits = data.get('outputs', [])
+        except Exception as e:
+            logger.error(f"Failed to retrieve deposits: {e}")
+            return []
         logger.info(f"Retrieved {len(deposits)} BTC deposits")
         logger.debug(f"BTC last deposit: {deposits[-1]}")
         return deposits

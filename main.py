@@ -117,16 +117,18 @@ async def wait_for_confirmations(account: SoftAccount):
         private_key=account.settings['private_key'],
         proxy=account.settings.get('proxy')  # Pass the proxy
     )
-    check_interval = 600  # Check every 10 minutes
-    max_checks = 36  # Wait up to 3 hours
+    check_interval = 1800  # Check every 30 minutes
+    max_checks = 6  # Wait up to 3 hours
 
     for _ in range(max_checks):
         deposits = lombard_api.get_deposits_by_address()
         if deposits:
             for deposit in deposits:
-                if deposit['address'] == account.btc_address:
+                if deposit['address'] == account.btc_address and deposit['claim_tx']:
                     logger.info("Required confirmations reached")
                     return
+                else:
+                    logger.info("Required confirmations not reached yet")
         else:
             logger.info("No deposits found yet")
 
