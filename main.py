@@ -144,8 +144,8 @@ async def mint_lbtc(account: SoftAccount):
     tx_hash = await lbtc_ops.claim_lbtc()
 
     if tx_hash:
-        account.transaction_hash = tx_hash # Wrap tx_hash in a dictionary    
-        logger.info(f"LBTC mint transaction initiated. Transaction hash: {tx_hash}")
+        account.transaction_hash = tx_hash  
+        logger.debug(f"LBTC mint transaction initiated. Transaction hash: {tx_hash}")
     else:
         raise Exception("Failed to mint LBTC")
 
@@ -206,9 +206,9 @@ async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[st
     logger.info("Restaking LBTC to Defi_Vault")
     lbtc_ops = LBTCOps(web3=web3, account=account)
     approve_tx_hash = await lbtc_ops.approve_lbtc(web3.to_checksum_address("0x5401b8620E5FB570064CA9114fd1e135fd77D57c"))
-    logger.info(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash}")
-    restake_tx_hash = await lbtc_ops.restake_lbtc_defi_vault(lbtc_ops.defi_vault_address)
-    logger.info(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash}")
+    logger.debug(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash}")
+    restake_tx_hash = await lbtc_ops.restake_lbtc_defi_vault()
+    logger.debug(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash}")
     return restake_tx_hash
 
 

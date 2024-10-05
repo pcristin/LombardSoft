@@ -1,12 +1,23 @@
 import logging
 import colorlog
+import os
+from datetime import datetime
+
+# Ensure the logs directory exists
+log_dir = './utils/logs'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+# Generate a unique log file name based on the current time and date
+log_filename = datetime.now().strftime("%H_%M %d_%m_%y") + '.log'
+log_filepath = os.path.join(log_dir, log_filename)
 
 # Set up logging
 logger = logging.getLogger('lombard_logger')
 logger.setLevel(logging.DEBUG)
 
 # Create a file handler
-file_handler = logging.FileHandler('./utils/logs/lombard_sdk.log')
+file_handler = logging.FileHandler(log_filepath)
 file_handler.setLevel(logging.DEBUG)
 
 # Create a console handler with colorlog
