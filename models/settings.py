@@ -280,7 +280,7 @@ class UserSettingsParser:
     def load_status(self, status_file: str = 'status.json'):
         """
         Loads the account statuses from a JSON file.
-
+        
         Args:
             status_file (str): The path to the status file.
         """
@@ -288,30 +288,42 @@ class UserSettingsParser:
             logger.info(f"Loading account statuses from {status_file}")
             with open(status_file, 'r') as f:
                 status_data = json.load(f)
-            for account, data in zip(self.accounts, status_data):
-                account_status = data.get('status')
-                if account_status:
-                    account.status = AccountStatus(account_status)
-                account.btc_address = data.get('btc_address')
-                account.withdrawal_id = data.get('withdrawal_id')
-                account.transaction_hash = data.get('transaction_hash')
+            # Expecting status_data to be a dictionary mapping private_key to status info
+            for account in self.accounts:
+                private_key = account.settings.get('private_key')
+                if private_key and private_key in status_data:
+                    data = status_data[private_key]
+                    account_status = data.get('status')
+                    if account_status:
+                        account.status = AccountStatus(account_status)
+                    account.btc_address = data.get('btc_address')
+                    account.withdrawal_id = data.get('withdrawal_id')
+                    account.transaction_hash = data.get('transaction_hash')
+                    logger.debug(f"Loaded status for account {account.address}: {account.status}")
+                else:
+                    logger.info(f"No existing status for account {account.address}. Setting to INIT.")
+                    account.status = AccountStatus.INIT
         else:
             logger.info(f"No existing status file found at {status_file}")
 
     def save_status(self, status_file: str = 'status.json'):
         """
         Saves the account statuses to a JSON file.
-
+        
         Args:
             status_file (str): The path to the status file.
         """
         logger.info(f"Saving account statuses to {status_file}")
-        status_data = [account.to_dict() for account in self.accounts]
-        # Convert int64 to int
+        status_data = {}
+        for account in self.accounts:
+            private_key = account.settings.get('private_key')
+            if private_key:
+                status_data[private_key] = account.to_dict()
+        # Convert int64 to int for JSON serialization
         def convert_int64(obj):
             if isinstance(obj, np.integer):
                 return int(obj)
             raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
-
         with open(status_file, 'w') as f:
             json.dump(status_data, f, indent=4, default=convert_int64)
+        logger.info("Account statuses saved successfully.")
