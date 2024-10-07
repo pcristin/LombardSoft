@@ -82,12 +82,18 @@ class LBTCOps:
                         await asyncio.sleep(60)  # Wait 1 minute before checking again
                         gas_price = self.web3.eth.gas_price
 
+                # Calculate max fee per gas
+                base_fee = self.web3.eth.get_block('latest').get('baseFeePerGas')
+                if not base_fee:
+                    raise Exception("Failed to get base fee")
+                max_fee_per_gas = int(base_fee * 1.3) + int(self.web3.eth.max_priority_fee)
+
                 # Build the transaction
                 nonce = self.web3.eth.get_transaction_count(self.account_address)
                 transaction = self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).build_transaction({
                     'from': self.account_address,
                     'nonce': nonce,
-                    'maxFeePerGas': gas_price,
+                    'maxFeePerGas': str(max_fee_per_gas),
                     'maxPriorityFeePerGas': self.web3.eth.max_priority_fee,
                     'gas': self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).estimate_gas({'from': self.account_address}),
                 })
@@ -148,7 +154,13 @@ class LBTCOps:
 
                 if amount == 0:
                     raise Exception("No LBTC balance available for restaking")
-
+                approved_amount = self.lbtc_contract.functions.allowance(self.account_address, restaking_address).call()
+                if approved_amount >= amount:
+                    logger.info("LBTC already approved for restaking")
+                    if self.account.transaction_hash_approve_lbtc:
+                        return self.account.transaction_hash_approve_lbtc
+                    else:
+                        return "Seems like you already approved LBTC for restaking manually, skipping approval"
                 # Wait until the gas price is acceptable
                 max_gas_gwei = str(self.account.settings.get('max_gas_gwei'))
                 if max_gas_gwei is not None:
@@ -162,6 +174,12 @@ class LBTCOps:
                         logger.info(f"Gas price {self.web3.from_wei(gas_price, 'gwei')} gwei is higher than max allowed {max_gas_gwei} gwei. Waiting...")
                         await asyncio.sleep(60)  # Wait 1 minute before checking again
                         gas_price = self.web3.eth.gas_price
+                
+                # Calculate max fee per gas
+                base_fee = self.web3.eth.get_block('latest').get('baseFeePerGas')
+                if not base_fee:
+                    raise Exception("Failed to get base fee")
+                max_fee_per_gas = int(base_fee * 1.3) + int(self.web3.eth.max_priority_fee)
 
                 # Approve LBTC transfer to vault
                 nonce = self.web3.eth.get_transaction_count(self.account_address)
@@ -169,12 +187,12 @@ class LBTCOps:
                     'from': self.account_address,
                     'nonce': nonce,
                     'gas': self.lbtc_contract.functions.approve(Web3.to_checksum_address(restaking_address), amount).estimate_gas({'from': self.account_address}),
-                    'maxFeePerGas': gas_price,
+                    'maxFeePerGas': str(max_fee_per_gas),
                     'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
                 })
                 signed_approve_tx = self.web3.eth.account.sign_transaction(approve_tx, private_key=self.private_key)
                 approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.raw_transaction)
-                self.web3.eth.wait_for_transaction_receipt(approve_tx_hash)
+                self.web3.eth.wait_for_transaction_receipt(approve_tx_hash, timeout=600)
                 logger.info(f"LBTC approved for restaking. Transaction hash: 0x{approve_tx_hash.hex()}")
                 return "0x" + approve_tx_hash.hex()
             except Exception as e:
@@ -215,6 +233,12 @@ class LBTCOps:
                         await asyncio.sleep(60)  # Wait 1 minute before checking again
                         gas_price = self.web3.eth.gas_price
                 
+                # Calculate max fee per gas
+                base_fee = self.web3.eth.get_block('latest').get('baseFeePerGas')
+                if not base_fee:
+                    raise Exception("Failed to get base fee")
+                max_fee_per_gas = int(base_fee * 1.3) + int(self.web3.eth.max_priority_fee)
+
                 nonce = self.web3.eth.get_transaction_count(self.account_address)
                 restake_tx = self.defi_vault_contract.functions.deposit(
                     self.lbtc_contract_address,
@@ -224,12 +248,12 @@ class LBTCOps:
                     'from': self.account_address,
                     'nonce': nonce,
                     'gas': self.defi_vault_contract.functions.deposit(self.lbtc_contract_address,amount,0).estimate_gas({'from': self.account_address}),
-                    'maxFeePerGas': gas_price,
+                    'maxFeePerGas': str(max_fee_per_gas),
                     'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
                 })
                 signed_restake_tx = self.web3.eth.account.sign_transaction(restake_tx, private_key=self.private_key)
                 restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.raw_transaction)
-                self.web3.eth.wait_for_transaction_receipt(restake_tx_hash)
+                self.web3.eth.wait_for_transaction_receipt(restake_tx_hash, timeout=600)
                 logger.info(f"LBTC restaked to vault. Transaction hash: 0x{restake_tx_hash.hex()}")
                 return "0x" + restake_tx_hash.hex()
             except Exception as e:

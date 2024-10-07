@@ -20,6 +20,7 @@ import pandas as pd
 from openpyxl import load_workbook
 import asyncio
 from utils.logger_config import AccountFilter
+from typing import Union
 PROVIDER_URL = "https://1rpc.io/eth" # ETHEREUM_RPC_URL
 
 def get_web3_instance(account: SoftAccount) -> Web3:
@@ -110,7 +111,7 @@ def deposit_btc(account: SoftAccount):
         raise Exception(f"Unsupported exchange: {exchange_name}")
 
     if withdrawal_id:
-        account.withdrawal_id = withdrawal_id
+        account.btc_withdrawal_id = withdrawal_id
         logger.info(f"BTC withdrawal initiated. Withdrawal ID: {withdrawal_id}")
     else:
         raise Exception("Failed to initiate BTC withdrawal")
@@ -150,7 +151,7 @@ async def mint_lbtc(account: SoftAccount):
     tx_hash = await lbtc_ops.claim_lbtc()
 
     if tx_hash:
-        account.transaction_hash = tx_hash  
+        account.transaction_hash_mint = tx_hash  
         logger.debug(f"LBTC mint transaction initiated. Transaction hash: {tx_hash}")
     else:
         raise Exception("Failed to mint LBTC")
@@ -159,13 +160,11 @@ def confirm_lbtc_mint(account: SoftAccount):
     logger.info("Confirming LBTC minting transaction")
     web3 = get_web3_instance(account)
 
-    tx_hash = account.transaction_hash
+    tx_hash = account.transaction_hash_mint
     if not tx_hash:
         raise Exception("No transaction hash found for LBTC minting")
 
     # Ensure tx_hash is a string or bytes
-    if isinstance(tx_hash, dict):
-        tx_hash = tx_hash  # Extract the hash if tx_hash is a dictionary
     tx_hash_bytes = HexBytes(tx_hash)  # Ensure tx_hash is in a compatible format
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash_bytes, timeout=600)
     if receipt["status"] == 1:
@@ -189,7 +188,7 @@ async def restake_lbtc(account: SoftAccount):
         raise Exception(f"Unknown vault: {selected_vault}")
 
     if tx_hash:
-        account.transaction_hash = tx_hash
+        account.transaction_hash_restake = tx_hash
         logger.info(f"LBTC restake transaction initiated. Transaction hash: {tx_hash}")
     else:
         raise Exception("Failed to restake LBTC")
@@ -199,7 +198,7 @@ def confirm_restake(account: SoftAccount):
     logger.info("Confirming LBTC restake transaction")
     web3 = get_web3_instance(account)
 
-    tx_hash = account.transaction_hash
+    tx_hash = account.transaction_hash_restake
     if not tx_hash:
         raise Exception("No transaction hash found for LBTC restaking")
 
@@ -210,12 +209,15 @@ def confirm_restake(account: SoftAccount):
     else:
         raise Exception("LBTC restaking transaction failed")
 
-async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[str]:
+async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Union[str, None]:
     logger.addFilter(AccountFilter(account.address))
     logger.info("Restaking LBTC to Defi_Vault")
     lbtc_ops = LBTCOps(web3=web3, account=account)
     approve_tx_hash = await lbtc_ops.approve_lbtc(web3.to_checksum_address("0x5401b8620E5FB570064CA9114fd1e135fd77D57c"))
-    logger.debug(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash}")
+    if approve_tx_hash == "Seems like you already approved LBTC for restaking manually, skipping approval":
+        logger.info(approve_tx_hash)
+    else:
+        logger.debug(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash}")
     restake_tx_hash = await lbtc_ops.restake_lbtc_defi_vault()
     logger.debug(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash}")
     return restake_tx_hash

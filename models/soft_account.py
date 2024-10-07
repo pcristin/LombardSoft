@@ -19,8 +19,10 @@ class SoftAccount:
             self.settings = settings
             self.status = status or AccountStatus.INIT
             self.btc_address = settings.get('btc_address')  # This will be updated later if generated
-            self.withdrawal_id: Union[str, None] = None  # For tracking withdrawals
-            self.transaction_hash: Union[str, None] = None  # For tracking blockchain transactions
+            self.btc_withdrawal_id: Union[str, None] = None  # For tracking BTC withdrawals
+            self.transaction_hash_mint: Union[str, None] = None  # For tracking mint LBTC transactions
+            self.transaction_hash_approve_lbtc: Union[str, None] = None # For tracking approval LBTC transactions
+            self.transaction_hash_restake: Union[str, None] = None # For tracking restake LBTC transactions
             logger.debug(f"SoftAccount initialized with status {self.status}")
             self.address = Account.from_key(settings['private_key']).address
         except ValueError as e:
@@ -48,8 +50,10 @@ class SoftAccount:
             'settings': self.settings,
             'status': self.status.value,
             'btc_address': self.btc_address,
-            'withdrawal_id': self.withdrawal_id,
-            'transaction_hash': self.transaction_hash,
+            'btc_withdrawal_id': self.btc_withdrawal_id,
+            'transaction_hash_mint': self.transaction_hash_mint,
+            'transaction_hash_approve_lbtc': self.transaction_hash_approve_lbtc,
+            'transaction_hash_restake': self.transaction_hash_restake
         }
     
     @classmethod
@@ -67,6 +71,8 @@ class SoftAccount:
         status = AccountStatus(data['status'])
         account = cls(settings, status)
         account.btc_address = data.get('btc_address')
-        account.withdrawal_id = data.get('withdrawal_id')
-        account.transaction_hash = data.get('transaction_hash')
+        account.btc_withdrawal_id = data.get('btc_withdrawal_id')
+        account.transaction_hash_mint = data.get('transaction_hash_mint')
+        account.transaction_hash_approve_lbtc = data.get('transaction_hash_approve_lbtc')
+        account.transaction_hash_restake = data.get('transaction_hash_restake')
         return account

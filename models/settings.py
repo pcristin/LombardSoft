@@ -12,6 +12,8 @@ from eth_account import Account
 import secrets
 from openpyxl import load_workbook
 import numpy as np
+from web3 import Web3
+
 
 class UserSettingsParser:
     """
@@ -299,9 +301,9 @@ class UserSettingsParser:
                     account.btc_address = data.get('btc_address')
                     account.withdrawal_id = data.get('withdrawal_id')
                     account.transaction_hash = data.get('transaction_hash')
-                    logger.debug(f"Loaded status for account {account.address}: {account.status}")
+                    logger.debug(f"Loaded status for account {Web3.eth.account.from_key(private_key).address}: {account.status}")
                 else:
-                    logger.info(f"No existing status for account {account.address}. Setting to INIT.")
+                    logger.info(f"No existing status for account {Web3.eth.account.from_key(private_key).address}. Setting to INIT.")
                     account.status = AccountStatus.INIT
         else:
             logger.info(f"No existing status file found at {status_file}")
