@@ -87,7 +87,7 @@ class LBTCOps:
                 transaction = self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).build_transaction({
                     'from': self.account_address,
                     'nonce': nonce,
-                    'maxFeePerGas': gas_price,
+                    'maxFeePerGas': str(int(gas_price * 1.3)),
                     'maxPriorityFeePerGas': self.web3.eth.max_priority_fee,
                     'gas': self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).estimate_gas({'from': self.account_address}),
                 })
@@ -148,7 +148,10 @@ class LBTCOps:
 
                 if amount == 0:
                     raise Exception("No LBTC balance available for restaking")
-
+                approved_allowance = self.lbtc_contract.functions.allowance(self.account_address, restaking_address).call()
+                if approved_allowance >= amount:
+                    logger.info(f"LBTC was already approved. Approve tx {self.account.transaction_hash_approve_lbtc}")
+                    return self.account.transaction_hash_approve_lbtc
                 # Wait until the gas price is acceptable
                 max_gas_gwei = str(self.account.settings.get('max_gas_gwei'))
                 if max_gas_gwei is not None:
@@ -169,12 +172,12 @@ class LBTCOps:
                     'from': self.account_address,
                     'nonce': nonce,
                     'gas': self.lbtc_contract.functions.approve(Web3.to_checksum_address(restaking_address), amount).estimate_gas({'from': self.account_address}),
-                    'maxFeePerGas': gas_price,
+                    'maxFeePerGas': str(int(gas_price * 1.3)),
                     'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
                 })
                 signed_approve_tx = self.web3.eth.account.sign_transaction(approve_tx, private_key=self.private_key)
                 approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.raw_transaction)
-                self.web3.eth.wait_for_transaction_receipt(approve_tx_hash)
+                self.web3.eth.wait_for_transaction_receipt(approve_tx_hash, timeout=600)
                 logger.info(f"LBTC approved for restaking. Transaction hash: 0x{approve_tx_hash.hex()}")
                 return "0x" + approve_tx_hash.hex()
             except Exception as e:
@@ -224,12 +227,12 @@ class LBTCOps:
                     'from': self.account_address,
                     'nonce': nonce,
                     'gas': self.defi_vault_contract.functions.deposit(self.lbtc_contract_address,amount,0).estimate_gas({'from': self.account_address}),
-                    'maxFeePerGas': gas_price,
+                    'maxFeePerGas': str(int(gas_price * 1.3)),
                     'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
                 })
                 signed_restake_tx = self.web3.eth.account.sign_transaction(restake_tx, private_key=self.private_key)
                 restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.raw_transaction)
-                self.web3.eth.wait_for_transaction_receipt(restake_tx_hash)
+                self.web3.eth.wait_for_transaction_receipt(restake_tx_hash, timeout=600)
                 logger.info(f"LBTC restaked to vault. Transaction hash: 0x{restake_tx_hash.hex()}")
                 return "0x" + restake_tx_hash.hex()
             except Exception as e:

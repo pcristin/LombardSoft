@@ -145,7 +145,7 @@ class Bitget_API:
             raise Exception(f"HTTP error: {response.status_code} {response.text}")
 
 
-    def withdraw(self, amount: str, address: str) -> Dict[str, Any]:
+    def withdraw(self, amount: str, address: str, ccy: str, chain: str) -> Dict[str, Any]:
         """
         Withdraws funds to the specified address.
 
@@ -159,13 +159,22 @@ class Bitget_API:
         Raises:
             Exception: If the API call fails.
         """
-        logger.info("Withdrawing BTC")
+        logger.info(f"Withdrawing {ccy}")
+        match chain:
+            case 'BTC':
+                chain_dest = 'BITCOIN'
+            case 'Optimism':
+                chain_dest = 'OPTIMISM'
+            case 'Base':
+                chain_dest = 'BASE'
+            case _:
+                logger.error(f"Unsupported chain: {chain}")
         path = '/api/v2/spot/wallet/withdrawal'
         params = {
-            'coin': "BTC",
+            'coin': ccy,
             'transferType': "on_chain",
             'address': address,
-            'chain': "BTC",
+            'chain': chain_dest,
             'amount': amount,
         }
         logger.debug(f"Params for withdraw: {params}")
@@ -187,7 +196,6 @@ class Bitget_API:
         logger.info("Checking withdrawal status")
         path = '/api/v2/spot/wallet/withdrawal-records'
         params = {
-            ''
             'orderId': order_id
         }
         logger.debug(f"Params for get_withdrawal_status: {params}")

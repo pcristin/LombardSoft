@@ -13,14 +13,202 @@ from sdks.exchanges_sdk.okx_api import OKX_API
 from sdks.exchanges_sdk.bitget_api import Bitget_API
 from web3 import Web3, HTTPProvider
 from sdks.lombard_sdk.lbtc_operations import LBTCOps
-from typing import Optional
+from typing import Optional, Union
 import requests
 from hexbytes import HexBytes
 import pandas as pd
 from openpyxl import load_workbook
 import asyncio
 from utils.logger_config import AccountFilter
-PROVIDER_URL = "https://1rpc.io/eth" # ETHEREUM_RPC_URL
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+ETH_RPC_URL = os.getenv("ETH_RPC_URL")
+OP_RPC_URL = os.getenv("OP_RPC_URL")
+ARB_RPC_URL = os.getenv("ARB_RPC_URL")
+BASE_RPC_URL = os.getenv("BASE_RPC_URL")
+
+def check_eth_balance(account: SoftAccount) -> bool:
+    logger.addFilter(AccountFilter(account.address))
+    logger.info("Checking ETH balance")
+    web3 = get_web3_instance(account)
+    balance = web3.eth.get_balance(account.address) / 10**18  # Convert Wei to ETH
+    logger.info(f"ETH Balance: {balance} ETH")
+    if balance >= 0.0012:
+        logger.info("Sufficient ETH balance on Ethereum Mainnet")
+        return True
+    else:
+        return False
+
+def check_l2_eth_balance(account: SoftAccount) -> Union[tuple[str, bool], bool]:
+    logger.addFilter(AccountFilter(account.address))
+    logger.info("Checking L2 ETH balance")
+    for l2_chain in ['Optimism', 'Base', 'Arbitrum']:
+        match l2_chain:
+            case 'Optimism':
+                web3 = get_web3_op_instance(account)
+            case 'Base':
+                web3 = get_web3_base_instance(account)
+            case 'Arbitrum':
+                web3 = get_web3_arb_instance(account)
+        balance = web3.eth.get_balance(account.address) / 10**18  # Convert Wei to ETH
+        logger.info(f"L2 ETH Balance: {balance} ETH")
+        if balance >= 0.0022:
+            logger.info("Sufficient L2 ETH balance")
+            return (l2_chain, True)
+    else:
+        return False
+
+def get_web3_op_instance(account: SoftAccount) -> Web3:
+    logger.addFilter(AccountFilter(account.address))
+    logger.info("Getting Web3 instance for Optimism")
+    provider_url = "https://1rpc.io/op"
+    proxy = account.settings.get('proxy')
+    if proxy:
+        logger.info(f"Setting proxy for Web3: {proxy}")
+        # Configure HTTPProvider with proxy
+        session = requests.Session()
+        proxies = {
+            'http': f'http://{proxy}',
+            'https': f'http://{proxy}'
+        }
+        session.proxies.update(proxies)
+        provider = HTTPProvider(provider_url, session=session)
+        web3 = Web3(provider)
+    web3 = Web3(Web3.HTTPProvider(provider_url))
+    return web3
+
+def get_web3_arb_instance(account: SoftAccount) -> Web3:
+    logger.addFilter(AccountFilter(account.address))
+    logger.info("Getting Web3 instance for Arbitrum")
+    provider_url = "https://1rpc.io/arb"
+    proxy = account.settings.get('proxy')
+    if proxy:
+        logger.info(f"Setting proxy for Web3: {proxy}")
+        # Configure HTTPProvider with proxy
+        session = requests.Session()
+        proxies = {
+            'http': f'http://{proxy}',
+            'https': f'http://{proxy}'
+        }
+        session.proxies.update(proxies)
+        provider = HTTPProvider(provider_url, session=session)
+        web3 = Web3(provider)
+    web3 = Web3(Web3.HTTPProvider(provider_url))
+    return web3
+
+def get_web3_base_instance(account: SoftAccount) -> Web3:
+    logger.addFilter(AccountFilter(account.address))
+    logger.info("Getting Web3 instance for Base")
+    provider_url = "https://1rpc.io/base"
+    proxy = account.settings.get('proxy')
+    if proxy:
+        logger.info(f"Setting proxy for Web3: {proxy}")
+        # Configure HTTPProvider with proxy
+        session = requests.Session()
+        proxies = {
+            'http': f'http://{proxy}',
+            'https': f'http://{proxy}'
+        }
+        session.proxies.update(proxies)
+        provider = HTTPProvider(provider_url, session=session)
+        web3 = Web3(provider)
+    web3 = Web3(Web3.HTTPProvider(provider_url))
+    return web3
+
+def withdraw_eth(account: SoftAccount) -> None:
+    logger.addFilter(AccountFilter(account.address))
+    logger.info("Withdrawing ETH")
+    exchange_name = account.settings['exchange']
+    amount = account.settings['amount_to_withdraw']
+    chain = random.choice(['Optimism', 'Base'])
+    if exchange_name == 'OKX':
+        exchange_api = OKX_API(
+            api_key=account.settings['exchange_api_key'],
+            secret_key=account.settings['exchange_secret_key'],
+            passphrase=account.settings['exchange_passphrase']
+        )
+        # Deposit ETH
+    elif exchange_name == 'Bitget':
+        exchange_api = Bitget_API(
+            api_key=account.settings['exchange_api_key'],
+            secret_key=account.settings['exchange_secret_key'],
+            passphrase=account.settings['exchange_passphrase']
+        )
+    else:
+        raise Exception(f"Unsupported exchange: {exchange_name}")
+    withdraw_id = exchange_api.withdraw(address=account.address, amount=amount, ccy='ETH', chain=chain)
+
+    if withdraw_id and isinstance(withdraw_id, dict):
+        account.withdrawal_id_eth = withdraw_id['data']['orderId']
+    elif withdraw_id and isinstance(withdraw_id, str):
+        account.withdrawal_id_eth = withdraw_id
+        logger.info(f"ETH withdrawal initiated. Withdrawal ID: {withdraw_id}")
+    else:
+        raise Exception("Failed to initiate ETH withdrawal")
+
+async def wait_for_withdrawal_confirmation_eth(account: SoftAccount) -> Union[bool, None]:
+    logger.addFilter(AccountFilter(account.address))
+    logger.info("Waiting for ETH withdrawal confirmation")
+    exchange_name = account.settings['exchange']
+    confirmed = False
+    if exchange_name == 'OKX':
+        exchange_api = OKX_API(
+            api_key=account.settings['exchange_api_key'],
+            secret_key=account.settings['exchange_secret_key'],
+            passphrase=account.settings['exchange_passphrase']
+        )
+        if account.withdrawal_id_eth:
+            for _ in range(10):
+                withdrawal_status = exchange_api.get_withdrawal_status(account.withdrawal_id_eth)
+                if withdrawal_status is not None:
+                    logger.info(f"Withdrawal state for wid {account.withdrawal_id_eth}]: {withdrawal_status['state']}")
+                    if 'Withdrawal complete' in withdrawal_status['state']:
+                        confirmed = True
+                        logger.info(f"ETH withdrawal confirmed")
+                        return confirmed
+                    else:
+                        logger.info(f"ETH withdrawal not confirmed yet, waiting for 60 seconds...")
+                        await asyncio.sleep(60)
+            if not confirmed:
+                logger.error(f"Couldn't confirm ETH withdrawal in 10 minutes with wdId: {account.withdrawal_id_eth} ")
+                return False
+        else:
+            logger.error('There was no withdrawal id found')
+            return False
+        
+    elif exchange_name == 'Bitget':
+        exchange_api = Bitget_API(
+            api_key=account.settings['exchange_api_key'],
+            secret_key=account.settings['exchange_secret_key'],
+            passphrase=account.settings['exchange_passphrase']
+        )
+        if account.withdrawal_id_eth:
+            for _ in range(10):
+                withdrawal_status = exchange_api.get_withdrawal_status(account.withdrawal_id_eth)
+                if withdrawal_status is not None:
+                    logger.info(f"Withdrawal state for wid {account.withdrawal_id_eth}]: {withdrawal_status['data'][0]['status']}")
+                    if withdrawal_status['msg'] == 'success':
+                        confirmed = True
+                        logger.info(f"ETH withdrawal confirmed")
+                        return confirmed
+                    else:
+                        logger.info(f"ETH withdrawal not confirmed yet, waiting for 60 seconds...")
+                        await asyncio.sleep(60)
+            if not confirmed:
+                logger.error(f"Couldn't confirm ETH withdrawal in 10 minutes with wdId: {account.withdrawal_id_eth} ")
+                return False
+        else:
+            logger.error('There was no withdrawal id found')
+            return False
+    else:
+        raise Exception(f"Unsupported exchange: {exchange_name}")
+    
+async def bridge_from_l2(account: SoftAccount, source_l2_chain: str) -> Union[str, None]:
+    # Implement realy bridge from source_l2_chain
+    return None
 
 def get_web3_instance(account: SoftAccount) -> Web3:
     """
@@ -33,7 +221,7 @@ def get_web3_instance(account: SoftAccount) -> Web3:
         Web3: The initialized Web3 instance.
     """
     logger.addFilter(AccountFilter(account.address))
-    provider_url = PROVIDER_URL
+    provider_url = ETH_RPC_URL
     proxy = account.settings.get('proxy')
     if proxy:
         logger.info(f"Setting proxy for Web3: {proxy}")
@@ -72,9 +260,9 @@ def generate_btc_address(account: SoftAccount) -> str:
     else:
         raise Exception("Failed to generate BTC address")
 
-def deposit_btc(account: SoftAccount):
+def withdraw_btc(account: SoftAccount):
     logger.addFilter(AccountFilter(account.address))
-    logger.info("Initiating BTC deposit")
+    logger.info("Initiating BTC withdrawal")
     exchange_name = account.settings['exchange']
     # Randomly generate BTC amount between min_BTC and max_BTC
     amount = random.uniform(account.settings['min_BTC'], account.settings['max_BTC'])
@@ -91,7 +279,7 @@ def deposit_btc(account: SoftAccount):
         )
         # Withdraw BTC
         if btc_address:
-            withdrawal_id = exchange_api.withdraw(amount=amount_str, address=btc_address)
+            withdrawal_id = exchange_api.withdraw(amount=amount_str, address=btc_address, ccy='BTC', chain='BTC')
         else:
             raise ValueError("BTC address cannot be None")
     elif exchange_name == 'Bitget':
@@ -103,21 +291,21 @@ def deposit_btc(account: SoftAccount):
         )
         # Withdraw BTC
         if btc_address:
-            withdrawal_id = exchange_api.withdraw(amount=amount_str, address=btc_address)['data']['orderId']
+            withdrawal_id = exchange_api.withdraw(amount=amount_str, address=btc_address, ccy='BTC', chain='BTC')['data']['orderId']
         else:
             raise ValueError("BTC address cannot be None")
     else:
         raise Exception(f"Unsupported exchange: {exchange_name}")
 
     if withdrawal_id:
-        account.withdrawal_id = withdrawal_id
+        account.withdrawal_id_btc = withdrawal_id
         logger.info(f"BTC withdrawal initiated. Withdrawal ID: {withdrawal_id}")
     else:
         raise Exception("Failed to initiate BTC withdrawal")
 
 async def wait_for_confirmations(account: SoftAccount):
     logger.addFilter(AccountFilter(account.address))
-    logger.info("Waiting for BTC deposit confirmations")
+    logger.info("Waiting for BTC withdrawal confirmations")
     lombard_api = LombardAPI(
         private_key=account.settings['private_key'],
         proxy=account.settings.get('proxy')  # Pass the proxy
@@ -126,12 +314,12 @@ async def wait_for_confirmations(account: SoftAccount):
     max_checks = 8  # Wait up to 3 hours
 
     for _ in range(max_checks):
-        deposits = lombard_api.get_deposits_by_address()
-        if len(deposits) > 0:
-            for deposit in deposits:
-                if deposit['address'] == account.btc_address and 'notarization_wait_dur' in deposit:
+        withdrawals = lombard_api.get_deposits_by_address()
+        if len(withdrawals) > 0:
+            for withdrawal in withdrawals:
+                if withdrawal['address'] == account.btc_address and 'notarization_wait_dur' in withdrawal:
                     logger.info("Required confirmations not reached yet")
-                elif deposit['address'] == account.btc_address and 'raw_payload' in deposit and 'signature' in deposit:
+                elif withdrawal['address'] == account.btc_address and 'raw_payload' in withdrawal and 'signature' in withdrawal:
                     logger.info("Required confirmations reached")
                     return
         else:
@@ -150,7 +338,7 @@ async def mint_lbtc(account: SoftAccount):
     tx_hash = await lbtc_ops.claim_lbtc()
 
     if tx_hash:
-        account.transaction_hash = tx_hash  
+        account.transaction_hash_mint_lbtc = tx_hash  
         logger.debug(f"LBTC mint transaction initiated. Transaction hash: {tx_hash}")
     else:
         raise Exception("Failed to mint LBTC")
@@ -159,13 +347,10 @@ def confirm_lbtc_mint(account: SoftAccount):
     logger.info("Confirming LBTC minting transaction")
     web3 = get_web3_instance(account)
 
-    tx_hash = account.transaction_hash
+    tx_hash = account.transaction_hash_mint_lbtc
     if not tx_hash:
         raise Exception("No transaction hash found for LBTC minting")
 
-    # Ensure tx_hash is a string or bytes
-    if isinstance(tx_hash, dict):
-        tx_hash = tx_hash  # Extract the hash if tx_hash is a dictionary
     tx_hash_bytes = HexBytes(tx_hash)  # Ensure tx_hash is in a compatible format
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash_bytes, timeout=600)
     if receipt["status"] == 1:
@@ -189,7 +374,7 @@ async def restake_lbtc(account: SoftAccount):
         raise Exception(f"Unknown vault: {selected_vault}")
 
     if tx_hash:
-        account.transaction_hash = tx_hash
+        account.transaction_hash_restake_lbtc = tx_hash
         logger.info(f"LBTC restake transaction initiated. Transaction hash: {tx_hash}")
     else:
         raise Exception("Failed to restake LBTC")
@@ -199,7 +384,7 @@ def confirm_restake(account: SoftAccount):
     logger.info("Confirming LBTC restake transaction")
     web3 = get_web3_instance(account)
 
-    tx_hash = account.transaction_hash
+    tx_hash = account.transaction_hash_restake_lbtc
     if not tx_hash:
         raise Exception("No transaction hash found for LBTC restaking")
 
@@ -215,8 +400,10 @@ async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[st
     logger.info("Restaking LBTC to Defi_Vault")
     lbtc_ops = LBTCOps(web3=web3, account=account)
     approve_tx_hash = await lbtc_ops.approve_lbtc(web3.to_checksum_address("0x5401b8620E5FB570064CA9114fd1e135fd77D57c"))
+    account.transaction_hash_approve_lbtc = approve_tx_hash
     logger.debug(f"LBTC approved for restaking. Transaction hash: {approve_tx_hash}")
     restake_tx_hash = await lbtc_ops.restake_lbtc_defi_vault()
+    account.transaction_hash_restake_lbtc = restake_tx_hash
     logger.debug(f"LBTC restaked to vault. Transaction hash: {restake_tx_hash}")
     return restake_tx_hash
 
@@ -275,12 +462,41 @@ async def process_account(account: SoftAccount, parser: UserSettingsParser, stat
             return
 
         if account.status == AccountStatus.BTC_ADDRESS_GENERATED:
-            deposit_btc(account)
+            withdraw_btc(account)
             account.update_status(AccountStatus.BTC_DEPOSIT_INITIATED)
 
         if account.status == AccountStatus.BTC_DEPOSIT_INITIATED:
             await wait_for_confirmations(account)
-            account.update_status(AccountStatus.BTC_CONFIRMATIONS_PENDING)
+            account.update_status(AccountStatus.CHECKING_ETH_BALANCE)
+        
+        if account.status == AccountStatus.CHECKING_ETH_BALANCE:
+            check_eth_result = check_eth_balance(account)
+            if check_eth_result:
+                account.update_status(AccountStatus.BTC_CONFIRMATIONS_PENDING)
+            else:
+                account.update_status(AccountStatus.CHECKING_L2_ETH_BALANCE)
+
+        if account.status == AccountStatus.CHECKING_L2_ETH_BALANCE:
+            check_l2_eth_result = check_l2_eth_balance(account)
+            if isinstance(check_l2_eth_result, tuple):
+                source_l2_chain = check_l2_eth_result[0]
+                account.update_status(AccountStatus.BRIDGING_FROM_L2)
+            else:
+                account.update_status(AccountStatus.WITHDRAWING_ETH_FROM_EXCHANGE)
+
+        if account.status == AccountStatus.WITHDRAWING_ETH_FROM_EXCHANGE:
+            withdraw_eth(account)
+            account.update_status(AccountStatus.WITHDRAWING_ETH_FROM_EXCHANGE_CONFIRMATION)
+
+        if account.status == AccountStatus.WITHDRAWING_ETH_FROM_EXCHANGE_CONFIRMATION:
+            eth_withdrawal_status = await wait_for_withdrawal_confirmation_eth(account)
+            if not eth_withdrawal_status:
+                raise KeyError(f"Couldn't confirm ETH withdrawal from {account.settings.get('exchange')}")
+            account.update_status(AccountStatus.BRIDGING_FROM_L2)
+        
+        if account.status == AccountStatus.BRIDGING_FROM_L2:
+            await bridge_from_l2(account, source_l2_chain)
+            account.update_status(AccountStatus.BRIDGING_FROM_L2_CONFIRMATION)
 
         if account.status == AccountStatus.BTC_CONFIRMATIONS_PENDING:
             await mint_lbtc(account)

@@ -29,7 +29,7 @@ class OKX_API:
         logger.debug("OKX_API initialized")
 
 
-    def get_withdrawal_fee(self,) -> Union[str, None]:
+    def get_withdrawal_fee(self, ccy: str, chain: str) -> Union[str, None]:
         """
         Get the withdrawal fee for a specific currency and chain.
 
@@ -43,22 +43,32 @@ class OKX_API:
         Raises:
             Exception: If the API call fails.
         """
-
+        match chain:
+            case 'BTC':
+                chain_dest = 'BTC-Bitcoin'
+            case 'Optimism':
+                chain_dest = 'ETH-Optimism'
+            case 'Base':
+                chain_dest = 'ETH-Base'
+            case _:
+                logger.error(f"Unsupported chain: {chain}")
+                return None
         logger.info("Getting withdrawal fee")
         try:
-            fee = self.Funding.get_currencies(ccy="BTC")
+            fee = self.Funding.get_currencies(ccy=ccy)
             if fee['code'] == '0':
-                fee_res = fee['data'][0]['minFee']
+                for chain_ccy in fee['data']:
+                    if chain_ccy['chain'] == chain_dest:
+                        return chain_ccy['minFee']
             else:
                 logger.error(f"Error getting withdrawal fee with code: {fee['code']} and msg: {fee['msg']}")
+                return None
         except Exception as e:
             logger.error(f"Error getting withdrawal fee: {e}")
             return None
-        logger.debug(f"Result for get_withdrawal_fee: {fee_res}")
-        return fee_res
 
 
-    def withdraw(self, amount: str, address: str,) -> Union[str, None]:
+    def withdraw(self, amount: str, address: str, ccy: str, chain: str) -> Union[str, None]:
         """
         Withdraws funds to the specified address.
 
@@ -73,13 +83,23 @@ class OKX_API:
             Exception: If the API call fails.
         """
         withdraw_id: Union[str, None] = None
-        logger.info("Withdrawing funds")
-        fee = self.get_withdrawal_fee()
+        logger.info(f"Withdrawing {ccy}")
+        fee = self.get_withdrawal_fee(ccy, chain)
+        match chain:
+            case 'BTC':
+                dest_chain = 'BTC-Bitcoin'
+            case 'Optimism':
+                dest_chain = 'ETH-Optimism'
+            case 'Base':
+                dest_chain = 'ETH-Base'
+            case _:
+                logger.error(f"Unsupported chain: {chain}")
+                return None
         if fee is None:
             logger.info("Error getting withdrawal fee")
             return None
         try:
-            withdraw_obj = self.Funding.withdrawal(ccy="BTC", amt=amount, dest='4', toAddr=address, fee=fee, chain='BTC-Bitcoin')
+            withdraw_obj = self.Funding.withdrawal(ccy=ccy, amt=amount, dest='4', toAddr=address, fee=fee, chain=dest_chain)
             logger.debug(f"Result for withdraw: {withdraw_obj}")
             if withdraw_obj['code'] == '0':
                 withdraw_id = withdraw_obj['data'][0]['wdId']
@@ -92,7 +112,7 @@ class OKX_API:
             logger.error(f"Error withdrawing funds: {e}")
             return None
 
-    def get_withdrawal_status(self, withdraw_id: str) -> Union[str, None]:
+    def get_withdrawal_status(self, withdraw_id: str) -> Union[dict[str, Any], None]:
         """
         Checks the status of a withdrawal transaction.
 
