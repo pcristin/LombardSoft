@@ -134,6 +134,7 @@ class Bitget_API:
         logger.debug(f"Response status code: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
+            response.close()
             if data.get('code') == '00000':
                 logger.debug(f"Response data: {data}")
                 return data
@@ -142,6 +143,7 @@ class Bitget_API:
                 raise Exception(f"API error: {data.get('msg')}")
         else:
             logger.error(f"HTTP error: {response.status_code} {response.text}")
+            response.close()
             raise Exception(f"HTTP error: {response.status_code} {response.text}")
 
 

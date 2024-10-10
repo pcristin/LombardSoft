@@ -57,7 +57,7 @@ class LBTCOps:
                     raise Exception("No deposits found for this account")
 
                 # Use the latest deposit
-                latest_deposit = deposits[-1]
+                latest_deposit = deposits[0]
                 data = latest_deposit.get('raw_payload')
                 proof_signature = latest_deposit.get('signature')
 
@@ -82,14 +82,20 @@ class LBTCOps:
                         await asyncio.sleep(60)  # Wait 1 minute before checking again
                         gas_price = self.web3.eth.gas_price
 
+                # Calculate max fee per gas
+                base_fee = self.web3.eth.get_block('latest').get('baseFeePerGas')
+                if not base_fee:
+                    raise Exception("Failed to get base fee")
+                max_fee_per_gas = int(base_fee) + int(round(self.web3.eth.max_priority_fee * 1.3))
+
                 # Build the transaction
                 nonce = self.web3.eth.get_transaction_count(self.account_address)
                 transaction = self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).build_transaction({
                     'from': self.account_address,
                     'nonce': nonce,
-                    'maxFeePerGas': str(int(gas_price * 1.3)),
-                    'maxPriorityFeePerGas': self.web3.eth.max_priority_fee,
                     'gas': self.lbtc_contract.functions.mint(data_bytes, proof_signature_bytes).estimate_gas({'from': self.account_address}),
+                    'maxFeePerGas': self.web3.to_wei(max_fee_per_gas, 'wei'),
+                    'maxPriorityFeePerGas': self.web3.to_wei(int(round(self.web3.eth.max_priority_fee * 1.3)), 'wei'),
                 })
 
                 # Sign the transaction
@@ -148,10 +154,13 @@ class LBTCOps:
 
                 if amount == 0:
                     raise Exception("No LBTC balance available for restaking")
-                approved_allowance = self.lbtc_contract.functions.allowance(self.account_address, restaking_address).call()
-                if approved_allowance >= amount:
-                    logger.info(f"LBTC was already approved. Approve tx {self.account.transaction_hash_approve_lbtc}")
-                    return self.account.transaction_hash_approve_lbtc
+                approved_amount = self.lbtc_contract.functions.allowance(self.account_address, restaking_address).call()
+                if approved_amount >= amount:
+                    logger.info("LBTC already approved for restaking")
+                    if self.account.transaction_hash_approve_lbtc:
+                        return self.account.transaction_hash_approve_lbtc
+                    else:
+                        return "Seems like you already approved LBTC for restaking manually, skipping approval"
                 # Wait until the gas price is acceptable
                 max_gas_gwei = str(self.account.settings.get('max_gas_gwei'))
                 if max_gas_gwei is not None:
@@ -165,6 +174,12 @@ class LBTCOps:
                         logger.info(f"Gas price {self.web3.from_wei(gas_price, 'gwei')} gwei is higher than max allowed {max_gas_gwei} gwei. Waiting...")
                         await asyncio.sleep(60)  # Wait 1 minute before checking again
                         gas_price = self.web3.eth.gas_price
+                
+                # Calculate max fee per gas
+                base_fee = self.web3.eth.get_block('latest').get('baseFeePerGas')
+                if not base_fee:
+                    raise Exception("Failed to get base fee")
+                max_fee_per_gas = int(base_fee) + int(round(self.web3.eth.max_priority_fee * 1.3))
 
                 # Approve LBTC transfer to vault
                 nonce = self.web3.eth.get_transaction_count(self.account_address)
@@ -172,8 +187,8 @@ class LBTCOps:
                     'from': self.account_address,
                     'nonce': nonce,
                     'gas': self.lbtc_contract.functions.approve(Web3.to_checksum_address(restaking_address), amount).estimate_gas({'from': self.account_address}),
-                    'maxFeePerGas': str(int(gas_price * 1.3)),
-                    'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
+                    'maxFeePerGas': self.web3.to_wei(max_fee_per_gas, 'wei'),
+                    'maxPriorityFeePerGas': self.web3.to_wei(int(round(self.web3.eth.max_priority_fee * 1.3)), 'wei')
                 })
                 signed_approve_tx = self.web3.eth.account.sign_transaction(approve_tx, private_key=self.private_key)
                 approve_tx_hash = self.web3.eth.send_raw_transaction(signed_approve_tx.raw_transaction)
@@ -218,6 +233,12 @@ class LBTCOps:
                         await asyncio.sleep(60)  # Wait 1 minute before checking again
                         gas_price = self.web3.eth.gas_price
                 
+                # Calculate max fee per gas
+                base_fee = self.web3.eth.get_block('latest').get('baseFeePerGas')
+                if not base_fee:
+                    raise Exception("Failed to get base fee")
+                max_fee_per_gas = int(base_fee) + int(round(self.web3.eth.max_priority_fee * 1.3))
+
                 nonce = self.web3.eth.get_transaction_count(self.account_address)
                 restake_tx = self.defi_vault_contract.functions.deposit(
                     self.lbtc_contract_address,
@@ -227,8 +248,8 @@ class LBTCOps:
                     'from': self.account_address,
                     'nonce': nonce,
                     'gas': self.defi_vault_contract.functions.deposit(self.lbtc_contract_address,amount,0).estimate_gas({'from': self.account_address}),
-                    'maxFeePerGas': str(int(gas_price * 1.3)),
-                    'maxPriorityFeePerGas': self.web3.eth.max_priority_fee
+                    'maxFeePerGas': self.web3.to_wei(max_fee_per_gas, 'wei'),
+                    'maxPriorityFeePerGas': self.web3.to_wei(int(round(self.web3.eth.max_priority_fee * 1.3)), 'wei')
                 })
                 signed_restake_tx = self.web3.eth.account.sign_transaction(restake_tx, private_key=self.private_key)
                 restake_tx_hash = self.web3.eth.send_raw_transaction(signed_restake_tx.raw_transaction)

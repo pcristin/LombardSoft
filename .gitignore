@@ -17,3 +17,5 @@ utils/logs
 ~$Soft_settings.xlsx
 status.json
 sdks/lombard_sdk/__pycache__
+sdks/relay_sdk/__pycache__
+__pycache__

@@ -45,7 +45,8 @@ class LombardAPI:
             raise KeyError("You haven't provided the neccessary API KEY for captcha solving module! Terminating...")
         self.captcha_solver = CaptchaSolver(CAPTCHA_API_KEY)
         if proxy:
-            logger.info(f"Setting proxy for LombardAPI: {proxy}")
+            logger.info(f"Added proxy for LombardAPI")
+            logger.debug(f"Setting proxy for LombardAPI: {proxy}")
             proxies = {
                 'http': f'http://{proxy}',
                 'https': f'http://{proxy}'
@@ -98,6 +99,7 @@ class LombardAPI:
             logger.error(f"Response text: {response.text}")
         response.raise_for_status()
         data = response.json()
+        response.close()
         logger.debug(f"Response data: {data}")
         return data
 
