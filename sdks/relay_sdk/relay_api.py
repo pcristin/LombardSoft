@@ -12,8 +12,6 @@ import random
 
 class RelayAPI:
     def __init__(self, account: SoftAccount, source_chain: str):
-        logger.addFilter(AccountFilter(self.account.address))
-        logger.info(f"Initializing RelayAPI for account")
         self.account = account
         self.src_chain_name = source_chain
         self.dest_chain_name = 'Ethereum'
