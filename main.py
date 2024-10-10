@@ -139,6 +139,7 @@ async def bridge_from_l2(account: SoftAccount, source_l2_chain: str) -> Union[st
     relay_api = RelayAPI(account, source_l2_chain)
     try:
         bridge_tx_hash = await relay_api.bridge_eth()
+        account.transaction_hash_bridge_eth = bridge_tx_hash
         return bridge_tx_hash
     except Exception as e:
         return None
@@ -328,7 +329,7 @@ def confirm_restake(account: SoftAccount):
     else:
         raise Exception("LBTC restaking transaction failed")
 
-async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Optional[str]:
+async def restake_to_defi_vault(web3: Web3, account: SoftAccount) -> Union[str, None]:
     logger.addFilter(AccountFilter(account.address))
     logger.info("Restaking LBTC to Defi_Vault")
     lbtc_ops = LBTCOps(web3=web3, account=account)
