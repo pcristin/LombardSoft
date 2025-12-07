@@ -85,7 +85,7 @@ Twisted==24.7.0
 types-requests
 typing_extensions==4.12.2
 tzdata==2024.2
-urllib3==1.26.20
+urllib3==2.6.0
 w3lib==2.2.1
 web3==7.2.0
 websockets==10.4
