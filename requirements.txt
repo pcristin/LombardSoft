@@ -64,7 +64,7 @@ pycryptodome==3.20.0
 pydantic==2.9.2
 pydantic_core==2.23.4
 pyee==11.1.1
-pyOpenSSL==24.2.1
+pyOpenSSL==26.0.0
 pyquery==2.0.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
